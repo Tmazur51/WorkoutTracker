@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<!-- iOS "Add to Home Screen" niceties -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="IronLog">
+<meta name="theme-color" content="#14161B">
+<title>IronLog</title>
+<style>
+  :root {
+    --bg: #14161B;
+    --surface: #1C1F26;
+    --surface-2: #22262F;
+    --line: #2C313B;
+    --text: #E8EAF0;
+    --muted: #868D99;
+    --chalk: #F6F8FB;
+    --up: #3FB984;      /* beat last time */
+    --down: #D2953F;    /* under last time */
+    --same: #868D99;
+    --focus: #6AA6FF;
+    --font-ui: -apple-system, BlinkMacSystemFont, system-ui, "Segoe UI", Roboto, sans-serif;
+    --font-mono: ui-monospace, "SF Mono", SFMono-Regular, Menlo, Monaco, "Cascadia Code", monospace;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.4;
+    /* respect notch / home indicator when added to home screen */
+    padding:
+      max(16px, env(safe-area-inset-top))
+      max(16px, env(safe-area-inset-right))
+      max(28px, env(safe-area-inset-bottom))
+      max(16px, env(safe-area-inset-left));
+  }
+
+  .wrap { max-width: 520px; margin: 0 auto; }
+
+  /* ---- header ---- */
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 4px 2px 20px;
+    border-bottom: 1px solid var(--line);
+    margin-bottom: 22px;
+  }
+  .wordmark {
+    font-family: var(--font-mono);
+    font-size: 14px;
+    font-weight: 700;
+    letter-spacing: 0.28em;
+    color: var(--chalk);
+  }
+  .wordmark .dot { color: var(--up); }
+  .today-date {
+    font-size: 12.5px;
+    color: var(--muted);
+    text-align: right;
+    letter-spacing: 0.01em;
+  }
+
+  /* ---- section labels ---- */
+  .eyebrow {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin: 0 2px 12px;
+  }
+
+  /* ---- preview-mode banner (shown only when storage is unavailable) ---- */
+  #banner {
+    display: none;
+    background: rgba(210, 149, 63, 0.10);
+    border: 1px solid rgba(210, 149, 63, 0.35);
+    color: var(--down);
+    font-size: 12.5px;
+    line-height: 1.45;
+    padding: 10px 12px;
+    border-radius: 10px;
+    margin-bottom: 20px;
+  }
+  #banner strong { color: #E9B466; font-weight: 600; }
+
+  /* ---- add form ---- */
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 14px;
+  }
+  form.add {
+    padding: 16px 16px 18px;
+    margin-bottom: 30px;
+  }
+  .field { margin-bottom: 12px; }
+  .field:last-of-type { margin-bottom: 0; }
+  label {
+    display: block;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    margin-bottom: 6px;
+  }
+  input[type="text"] {
+    width: 100%;
+    min-height: 46px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    color: var(--text);
+    font-family: var(--font-ui);
+    font-size: 16px;               /* 16px stops iOS from zooming on focus */
+    padding: 0 14px;
+  }
+  input.num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    text-align: center;
+  }
+  input:focus-visible,
+  button:focus-visible {
+    outline: 2px solid var(--focus);
+    outline-offset: 2px;
+  }
+  input::placeholder { color: #565D6A; }
+
+  .row {
+    display: grid;
+    grid-template-columns: 1.3fr 1fr 1fr;
+    gap: 10px;
+  }
+
+  .weight-wrap { position: relative; }
+  .unit-toggle {
+    display: inline-flex;
+    gap: 2px;
+    margin-top: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 2px;
+  }
+  .unit-toggle button {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: var(--muted);
+    font-family: var(--font-mono);
+    font-size: 12px;
+    letter-spacing: 0.04em;
+    padding: 5px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    min-height: 30px;
+  }
+  .unit-toggle button.on {
+    background: var(--chalk);
+    color: #14161B;
+    font-weight: 600;
+  }
+
+  .hint {
+    font-family: var(--font-mono);
+    font-size: 12.5px;
+    color: var(--muted);
+    margin: 12px 2px 0;
+    min-height: 16px;
+  }
+  .hint b { color: var(--text); font-weight: 600; }
+
+  .btn-primary {
+    appearance: none;
+    width: 100%;
+    min-height: 48px;
+    margin-top: 16px;
+    background: var(--chalk);
+    color: #14161B;
+    border: 0;
+    border-radius: 10px;
+    font-family: var(--font-ui);
+    font-size: 15px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    cursor: pointer;
+    transition: transform 0.06s ease, opacity 0.15s ease;
+  }
+  .btn-primary:active { transform: scale(0.985); }
+
+  /* ---- session + entries ---- */
+  .session { margin-bottom: 26px; }
+  .session-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    padding: 0 2px 10px;
+  }
+  .session-date { font-size: 15px; font-weight: 600; color: var(--text); }
+  .session-date .rel { color: var(--muted); font-weight: 400; font-size: 12.5px; margin-left: 8px; }
+  .session-count { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+
+  .entry {
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 12px;
+    padding: 13px 14px;
+    margin-bottom: 8px;
+  }
+  .entry-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 7px;
+  }
+  .entry-name {
+    font-size: 15.5px;
+    font-weight: 600;
+    color: var(--text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .entry-right { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+
+  .chip {
+    font-family: var(--font-mono);
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    padding: 3px 8px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+  .chip.up   { color: var(--up);   background: rgba(63, 185, 132, 0.12); }
+  .chip.down { color: var(--down); background: rgba(210, 149, 63, 0.12); }
+  .chip.same { color: var(--same); background: rgba(134, 141, 153, 0.12); }
+
+  .del {
+    appearance: none;
+    border: 0;
+    background: transparent;
+    color: #4E5560;
+    font-size: 20px;
+    line-height: 1;
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: color 0.12s ease, background 0.12s ease;
+  }
+  .del:hover { color: var(--down); background: var(--surface-2); }
+
+  .stats {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    color: var(--muted);
+    font-size: 13.5px;
+  }
+  .stats .weight { color: var(--chalk); font-size: 22px; font-weight: 700; }
+  .stats .x { color: #4E5560; }
+
+  /* ---- empty state ---- */
+  .empty {
+    text-align: center;
+    color: var(--muted);
+    font-size: 14px;
+    padding: 30px 16px;
+    border: 1px dashed var(--line);
+    border-radius: 12px;
+  }
+
+  /* ---- footer ---- */
+  footer {
+    margin-top: 32px;
+    padding-top: 18px;
+    border-top: 1px solid var(--line);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+  .footnote { font-size: 12px; color: #5A616D; }
+  .footnote b { color: var(--muted); font-weight: 500; }
+  .foot-actions { display: flex; gap: 8px; }
+  .btn-ghost {
+    appearance: none;
+    background: transparent;
+    border: 1px solid var(--line);
+    color: var(--muted);
+    font-family: var(--font-ui);
+    font-size: 12.5px;
+    padding: 7px 12px;
+    border-radius: 8px;
+    cursor: pointer;
+    min-height: 34px;
+  }
+  .btn-ghost:hover { color: var(--text); border-color: #3A404C; }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { transition: none !important; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="wordmark">IRON<span class="dot">·</span>LOG</div>
+      <div class="today-date" id="today-date"></div>
+    </header>
+
+    <div id="banner">
+      <strong>Preview mode.</strong> Storage is blocked here, so entries won't be
+      remembered between reloads. Once this file runs on your phone, everything saves automatically.
+    </div>
+
+    <!-- Log something -->
+    <p class="eyebrow">Log a set</p>
+    <form class="add card" id="add-form" autocomplete="off">
+      <div class="field">
+        <label for="ex-name">Exercise</label>
+        <input type="text" id="ex-name" list="ex-list" placeholder="e.g. Back squat" required>
+        <datalist id="ex-list"></datalist>
+      </div>
+
+      <div class="field">
+        <div class="row">
+          <div class="weight-wrap">
+            <label for="ex-weight">Weight</label>
+            <input type="text" id="ex-weight" class="num" inputmode="decimal" placeholder="—">
+          </div>
+          <div>
+            <label for="ex-reps">Reps</label>
+            <input type="text" id="ex-reps" class="num" inputmode="numeric" placeholder="8" required>
+          </div>
+          <div>
+            <label for="ex-sets">Sets</label>
+            <input type="text" id="ex-sets" class="num" inputmode="numeric" placeholder="3" required>
+          </div>
+        </div>
+        <div class="unit-toggle" id="unit-toggle">
+          <button type="button" data-unit="lb">lb</button>
+          <button type="button" data-unit="kg">kg</button>
+        </div>
+      </div>
+
+      <div class="hint" id="hint"></div>
+      <button type="submit" class="btn-primary">Add to today</button>
+    </form>
+
+    <!-- History (today shows up as the first session) -->
+    <p class="eyebrow">History</p>
+    <div id="log"></div>
+
+    <footer>
+      <div class="footnote">Data lives <b id="storage-note">on this device</b>.</div>
+      <div class="foot-actions">
+        <button class="btn-ghost" id="export-btn">Export</button>
+        <button class="btn-ghost" id="import-btn">Import</button>
+        <input type="file" id="import-file" accept="application/json" hidden>
+      </div>
+    </footer>
+  </div>
+
+<script>
+"use strict";
+
+/* =========================================================================
+   1. STORAGE
+   Uses localStorage (persists on your device). If a browser blocks it
+   — as the in-app preview does — it quietly falls back to memory so the
+   app still runs. This is the one file you'll host; nothing else needed.
+   ========================================================================= */
+const KEY = "ironlog.entries";
+
+const Store = (() => {
+  let mem = null;
+  let usable = false;
+  try {
+    const t = "__il_test__";
+    window.localStorage.setItem(t, "1");
+    window.localStorage.removeItem(t);
+    usable = true;
+  } catch (e) {
+    usable = false;
+  }
+  return {
+    usable,
+    load() {
+      try {
+        const raw = usable ? window.localStorage.getItem(KEY) : mem;
+        return raw ? JSON.parse(raw) : [];
+      } catch (e) { return []; }
+    },
+    save(list) {
+      const raw = JSON.stringify(list);
+      try {
+        if (usable) window.localStorage.setItem(KEY, raw);
+        else mem = raw;
+      } catch (e) { mem = raw; }
+    }
+  };
+})();
+
+let entries = Store.load();
+let unit = (entries[0] && entries[0].unit) || "lb";
+
+/* =========================================================================
+   2. SMALL HELPERS
+   ========================================================================= */
+const $ = (id) => document.getElementById(id);
+
+const esc = (s) => String(s).replace(/[&<>"']/g, c => (
+  { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]
+));
+
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+const norm = (s) => s.trim().toLowerCase();
+const round = (n) => Math.round(n * 100) / 100;
+
+function todayISO() {
+  const d = new Date();
+  const local = new Date(d.getTime() - d.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function makeDate(iso) {
+  const [y, m, dd] = iso.split("-").map(Number);
+  return new Date(y, m - 1, dd);
+}
+
+const fmtShort = (iso) =>
+  makeDate(iso).toLocaleDateString(undefined, { month: "short", day: "numeric" });
+
+const fmtFull = (iso) =>
+  makeDate(iso).toLocaleDateString(undefined, { weekday: "long", month: "long", day: "numeric" });
+
+function relativeLabel(iso) {
+  const t = todayISO();
+  if (iso === t) return "Today";
+  const diff = Math.round((makeDate(t) - makeDate(iso)) / 86400000);
+  if (diff === 1) return "Yesterday";
+  if (diff < 7) return diff + " days ago";
+  return "";
+}
+
+/* Most recent time this exercise was done on an EARLIER day. */
+function lastEntryFor(name, beforeDate) {
+  const n = norm(name);
+  const matches = entries.filter(e => norm(e.name) === n && e.date < beforeDate);
+  matches.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : b.ts - a.ts));
+  return matches[0] || null;
+}
+
+/* Compare a new entry to the previous one -> up / down / same. */
+function computeDelta(cur, prev) {
+  if (!prev) return null;
+  const cw = cur.weight, pw = prev.weight;
+  if (cw != null && pw != null) {
+    if (cw > pw) return { dir: "up",   text: "+" + round(cw - pw) + " " + cur.unit };
+    if (cw < pw) return { dir: "down", text: "\u2212" + round(pw - cw) + " " + cur.unit };
+  }
+  if (cur.reps > prev.reps) return { dir: "up",   text: "+" + (cur.reps - prev.reps) + " reps" };
+  if (cur.reps < prev.reps) return { dir: "down", text: "\u2212" + (prev.reps - cur.reps) + " reps" };
+  if (cur.sets > prev.sets) return { dir: "up",   text: "+" + (cur.sets - prev.sets) + " sets" };
+  if (cur.sets < prev.sets) return { dir: "down", text: "\u2212" + (prev.sets - cur.sets) + " sets" };
+  return { dir: "same", text: "matched" };
+}
+
+/* Group flat entries into day sessions, newest day first. */
+function sessions() {
+  const map = new Map();
+  for (const e of entries) {
+    if (!map.has(e.date)) map.set(e.date, []);
+    map.get(e.date).push(e);
+  }
+  const out = [...map.entries()].map(([date, es]) => ({
+    date,
+    entries: es.slice().sort((a, b) => a.ts - b.ts)
+  }));
+  out.sort((a, b) => (a.date < b.date ? 1 : -1));
+  return out;
+}
+
+function weightText(e) {
+  return e.weight == null
+    ? '<span class="weight">BW</span>'
+    : '<span class="weight">' + e.weight + '</span> ' + e.unit;
+}
+
+/* =========================================================================
+   3. RENDER
+   ========================================================================= */
+function render() {
+  $("today-date").textContent = fmtFull(todayISO());
+
+  // exercise autocomplete
+  const names = [...new Set(entries.map(e => e.name))].sort();
+  $("ex-list").innerHTML = names.map(n => '<option value="' + esc(n) + '">').join("");
+
+  // unit toggle state
+  document.querySelectorAll("#unit-toggle button").forEach(b =>
+    b.classList.toggle("on", b.dataset.unit === unit)
+  );
+
+  // sessions
+  const log = $("log");
+  const data = sessions();
+
+  if (data.length === 0) {
+    log.innerHTML = '<div class="empty">No lifts logged yet.<br>Add your first set above to get started.</div>';
+    return;
+  }
+
+  log.innerHTML = data.map(s => {
+    const rel = relativeLabel(s.date);
+    const rows = s.entries.map(e => {
+      const prev = lastEntryFor(e.name, s.date);
+      const d = computeDelta(e, prev);
+      const chip = d ? '<span class="chip ' + d.dir + '">' + esc(d.text) + '</span>' : "";
+      return (
+        '<div class="entry">' +
+          '<div class="entry-top">' +
+            '<div class="entry-name">' + esc(e.name) + '</div>' +
+            '<div class="entry-right">' +
+              chip +
+              '<button class="del" data-id="' + e.id + '" title="Delete" aria-label="Delete">\u00d7</button>' +
+            '</div>' +
+          '</div>' +
+          '<div class="stats">' +
+            '<span>' + weightText(e) + '</span>' +
+            '<span><span class="x">\u00d7</span> ' + e.reps + ' reps</span>' +
+            '<span><span class="x">\u00d7</span> ' + e.sets + ' sets</span>' +
+          '</div>' +
+        '</div>'
+      );
+    }).join("");
+
+    return (
+      '<div class="session">' +
+        '<div class="session-head">' +
+          '<div class="session-date">' + fmtShort(s.date) +
+            (rel ? '<span class="rel">' + rel + '</span>' : "") +
+          '</div>' +
+          '<div class="session-count">' + s.entries.length +
+            (s.entries.length === 1 ? " lift" : " lifts") + '</div>' +
+        '</div>' +
+        rows +
+      '</div>'
+    );
+  }).join("");
+}
+
+/* Live "last time" hint under the exercise field. */
+function updateHint() {
+  const name = $("ex-name").value.trim();
+  const hint = $("hint");
+  if (!name) { hint.innerHTML = ""; return; }
+  const prev = lastEntryFor(name, todayISO());
+  if (!prev) {
+    hint.innerHTML = "First time logging this \u2014 sets the baseline.";
+    return;
+  }
+  const w = prev.weight == null ? "BW" : prev.weight + " " + prev.unit;
+  hint.innerHTML = "Last time \u00b7 <b>" + esc(w) + " \u00d7 " + prev.reps +
+    " \u00d7 " + prev.sets + "</b> on " + fmtShort(prev.date);
+}
+
+/* =========================================================================
+   4. ACTIONS
+   ========================================================================= */
+function addEntry(e) {
+  e.preventDefault();
+
+  const name = $("ex-name").value.trim();
+  const wRaw = $("ex-weight").value.trim();
+  const reps = parseInt($("ex-reps").value, 10);
+  const sets = parseInt($("ex-sets").value, 10);
+
+  if (!name) return;
+  if (!Number.isFinite(reps) || reps <= 0 || !Number.isFinite(sets) || sets <= 0) {
+    $("hint").innerHTML = '<span style="color:var(--down)">Reps and sets need to be whole numbers.</span>';
+    return;
+  }
+  let weight = null;
+  if (wRaw !== "") {
+    weight = parseFloat(wRaw);
+    if (!Number.isFinite(weight) || weight < 0) {
+      $("hint").innerHTML = '<span style="color:var(--down)">Weight should be a number (or leave it blank for bodyweight).</span>';
+      return;
+    }
+  }
+
+  entries.push({ id: uid(), date: todayISO(), name, weight, reps, sets, unit, ts: Date.now() });
+  Store.save(entries);
+
+  // reset for fast repeat entry
+  $("ex-name").value = "";
+  $("ex-weight").value = "";
+  $("ex-reps").value = "";
+  $("ex-sets").value = "";
+  $("hint").innerHTML = "";
+  render();
+  $("ex-name").focus();
+}
+
+function deleteEntry(id) {
+  const e = entries.find(x => x.id === id);
+  if (!e) return;
+  if (!confirm('Delete "' + e.name + '"?')) return;
+  entries = entries.filter(x => x.id !== id);
+  Store.save(entries);
+  render();
+}
+
+function exportData() {
+  const blob = new Blob([JSON.stringify(entries, null, 2)], { type: "application/json" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "ironlog-backup-" + todayISO() + ".json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importData(file) {
+  const reader = new FileReader();
+  reader.onload = () => {
+    try {
+      const data = JSON.parse(reader.result);
+      if (!Array.isArray(data)) throw new Error("bad");
+      if (!confirm("Replace current data with " + data.length + " imported entries?")) return;
+      entries = data;
+      Store.save(entries);
+      render();
+    } catch (err) {
+      alert("That file couldn't be read as an IronLog backup.");
+    }
+  };
+  reader.readAsText(file);
+}
+
+/* =========================================================================
+   5. WIRE IT UP
+   ========================================================================= */
+$("add-form").addEventListener("submit", addEntry);
+$("ex-name").addEventListener("input", updateHint);
+
+$("unit-toggle").addEventListener("click", (e) => {
+  const btn = e.target.closest("button[data-unit]");
+  if (!btn) return;
+  unit = btn.dataset.unit;
+  render();
+});
+
+$("log").addEventListener("click", (e) => {
+  const btn = e.target.closest(".del");
+  if (btn) deleteEntry(btn.dataset.id);
+});
+
+$("export-btn").addEventListener("click", exportData);
+$("import-btn").addEventListener("click", () => $("import-file").click());
+$("import-file").addEventListener("change", (e) => {
+  if (e.target.files[0]) importData(e.target.files[0]);
+  e.target.value = "";
+});
+
+// preview-mode notice + footer text depend on whether storage works
+if (!Store.usable) {
+  $("banner").style.display = "block";
+  $("storage-note").textContent = "in memory (preview only)";
+}
+
+render();
+</script>
+</body>
+</html>
