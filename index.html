@@ -194,7 +194,7 @@
   #version { position: fixed; left: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); font-size: 10px; font-weight: 600; color: var(--dim); background: rgba(255,255,255,0.72); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; z-index: 40; pointer-events: none; font-variant-numeric: tabular-nums; }
 
   /* exercise picker */
-  #picker, #editor, #cardio { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  #picker, #editor, #cardio, #logflow { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
   .pick-panel { background: var(--surface); width: 100%; max-width: 540px; border-radius: 20px 20px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
   .pick-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
   .pick-title { flex: 1; font-size: 17px; font-weight: 700; color: var(--text); text-align: center; }
@@ -229,6 +229,15 @@
   .cardio-stats b { color: var(--text); font-weight: 700; }
   .cardio-stats .ic { color: var(--orange); }
   .chip.cardio-chip { color: var(--blue); background: var(--blue-bg); }
+  .pd-caret { transition: transform 0.15s ease; }
+  .pd-caret.open { transform: rotate(180deg); }
+  .plan-collapsed-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
+  .flow-name { font-size: 20px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; margin-top: 4px; }
+  .flow-target { font-size: 13px; color: var(--muted); margin-top: 4px; font-variant-numeric: tabular-nums; }
+  .flow-last { font-size: 13px; color: var(--muted); margin-top: 8px; }
+  .flow-last b { color: var(--text); font-weight: 700; }
+  .flow-inputs { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 16px 0 4px; }
+  .flow-inputs input.num { width: 100%; min-height: 48px; font-size: 18px; }
   .ed-card { background: #FBFBF9; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; margin-bottom: 10px; }
   .ed-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .ed-nm { font-size: 15px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -297,7 +306,7 @@
 
     <!-- ============ PLAN ============ -->
     <section class="page" id="page-plan">
-      <p class="eyebrow">Plan your split</p>
+      <p class="eyebrow">Edit workouts</p>
       <div id="plan-content"></div>
     </section>
 
@@ -346,7 +355,7 @@
 
   <nav class="tabbar"><div class="tabbar-inner">
     <button class="tab" data-tab="log"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg><span>Log</span></button>
-    <button class="tab" data-tab="plan"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 11h6"/><path d="M9 15h4"/></svg><span>Plan</span></button>
+    <button class="tab" data-tab="plan"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 11h6"/><path d="M9 15h4"/></svg><span>Edit</span></button>
     <button class="tab" data-tab="progress"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11"/><path d="M12 20V4"/><path d="M19 20v-6"/></svg><span>Progress</span></button>
     <button class="tab" data-tab="body"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg><span>Body</span></button>
   </div></nav>
@@ -354,7 +363,8 @@
   <div id="picker"></div>
   <div id="editor"></div>
   <div id="cardio"></div>
-  <div id="version">v16</div>
+  <div id="logflow"></div>
+  <div id="version">v17</div>
 
 <script>
 "use strict";
@@ -483,6 +493,8 @@ let editorWid = null;
 let editPlanId = null;
 let pickerFail = false, peEditFail = false, addFail = false;
 let cardioOpen = false, cardioEditId = null, cardioAct = "Cycling", cardioMinStr = "", cardioDistStr = "", cardioUnit = "mi", cardioCalStr = "", cardioHrStr = "";
+const planCollapsed = new Set();
+let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -624,14 +636,13 @@ function workoutCardHTML(w) {
   return '<div class="wk-card">' + main + bodyHtml + '</div>';
 }
 function startPromptHTML() {
-  let html = '<div class="card pad"><div class="start-title">Start today\u2019s workout</div>';
+  let html = '<div class="card pad"><div class="start-title">Log a workout</div>';
   if (plan.days.length) {
-    html += '<div class="start-sub">Start from your split:</div><div class="chips">' + plan.days.map(d => '<button class="chip-btn" data-action="start-plan" data-did="' + d.id + '">' + esc(d.name) + '</button>').join("") + '</div>';
-    html += '<div class="start-sub" style="margin-top:14px;">Or a quick one-off:</div><div class="chips">' + DAY_TYPES.map(t => '<button class="chip-btn" data-action="start" data-type="' + esc(t) + '">' + esc(t) + '</button>').join("") + '</div>';
+    html += '<div class="start-sub">Pick one of your workouts:</div><div class="chips">' + plan.days.map(d => '<button class="chip-btn" data-action="log-plan" data-did="' + d.id + '">' + esc(d.name) + '</button>').join("") + '</div>';
   } else {
-    html += '<div class="start-sub">Pick a day type, or build a reusable split in the Plan tab.</div><div class="chips">' + DAY_TYPES.map(t => '<button class="chip-btn" data-action="start" data-type="' + esc(t) + '">' + esc(t) + '</button>').join("") + '</div>';
+    html += '<div class="start-sub">You haven\u2019t built any workouts yet \u2014 head to the Edit tab to create one.</div>';
   }
-  html += '<div class="inline-row" style="margin-top:12px;"><input type="text" class="start-custom" placeholder="Custom name (optional)"><button class="btn-save" data-action="start-blank">Start</button></div></div>';
+  html += '<div class="start-sub" style="margin-top:14px;">Or start a blank one:</div><div class="inline-row"><input type="text" class="start-custom" placeholder="Name (optional)"><button class="btn-save" data-action="start-blank">Blank</button></div></div>';
   return html;
 }
 
@@ -644,27 +655,33 @@ function planExHTML(d, pe) {
   return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn" data-action="pe-edit" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
-  const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises planned yet.</div>';
+  const collapsed = planCollapsed.has(d.id);
+  const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises yet.</div>';
   let rLow = 0, rHigh = 0, tSets = 0;
   d.exercises.forEach(pe => { tSets += (pe.sets || 0); if (pe.toFailure) return; const hi = pe.repMax || pe.reps; rLow += (pe.sets || 0) * pe.reps; rHigh += (pe.sets || 0) * hi; });
   const repsStr = rHigh > rLow ? (rLow + "-" + rHigh) : ("" + rLow);
-  const repsPart = rHigh > 0 ? (" \u00b7 " + repsStr + " reps") : "";
-  const total = d.exercises.length ? '<div class="wk-total">Total \u00b7 ' + tSets + ' sets' + repsPart + '</div>' : "";
-  return '<div class="wk-card"><div class="plan-day-head"><input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete day">' + SVG.trash + '</button></div>' +
-    '<div class="plan-ex-list" data-did="' + d.id + '">' + rows + '</div>' + total +
-    '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
+  const volumeStr = tSets + " sets" + (rHigh > 0 ? " \u00b7 " + repsStr + " reps" : "");
+  const caret = '<button class="icon-btn pd-caret' + (collapsed ? "" : " open") + '" data-action="pd-toggle" data-did="' + d.id + '" aria-label="Expand or collapse">' + SVG.caret + '</button>';
+  const head = '<div class="plan-day-head">' + caret + '<input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete workout">' + SVG.trash + '</button></div>';
+  if (collapsed) {
+    const cnt = d.exercises.length;
+    const sum = cnt + (cnt === 1 ? " exercise" : " exercises") + (cnt ? " \u00b7 " + volumeStr : "");
+    return '<div class="wk-card">' + head + '<div class="plan-collapsed-sum">' + sum + '</div></div>';
+  }
+  const total = d.exercises.length ? '<div class="wk-total">Total \u00b7 ' + volumeStr + '</div>' : "";
+  return '<div class="wk-card">' + head + '<div class="plan-ex-list" data-did="' + d.id + '">' + rows + '</div>' + total + '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
 }
 function renderPlan() {
   const box = $("plan-content");
   if (plan.days.length === 0) {
-    box.innerHTML = '<div class="card pad"><div class="start-title">Choose a split</div><div class="start-sub">Pick a template to name your training days, then fill each with exercises. Or start from scratch.</div><div class="chips">' +
+    box.innerHTML = '<div class="card pad"><div class="start-title">Build your workouts</div><div class="start-sub">Start from a split template to name your workouts, then fill each with exercises \u2014 or start from scratch.</div><div class="chips">' +
       Object.keys(SPLITS).map(n => '<button class="chip-btn" data-action="split-preset" data-split="' + esc(n) + '">' + esc(n) + '</button>').join("") +
       '</div><button class="btn-ghost wide" data-action="add-day" style="margin-top:14px;">Start from scratch</button></div>';
     return;
   }
-  box.innerHTML = '<div class="plan-topbar"><div class="plan-splitname">' + (plan.splitName ? esc(plan.splitName) : "My split") + '</div><button class="link-btn" data-action="reset-plan">Reset</button></div>' +
+  box.innerHTML = '<div class="plan-topbar"><div class="plan-splitname">' + (plan.splitName ? esc(plan.splitName) : "My workouts") + '</div><button class="link-btn" data-action="reset-plan">Reset</button></div>' +
     plan.days.map(planDayHTML).join("") +
-    '<button class="btn-ghost wide" data-action="add-day">+ Add a day</button>';
+    '<button class="btn-ghost wide" data-action="add-day">+ Add a workout</button>';
 }
 
 /* ---- render ---- */
@@ -729,7 +746,7 @@ function setTab(t) {
   activeTab = t;
   ["log", "plan", "progress", "body"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
   document.querySelectorAll(".tabbar .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  const subs = { log: "Track your training and progress", plan: "Build and reuse your split", progress: "See your progress over time", body: "BMI and daily protein target" };
+  const subs = { log: "Track your training and progress", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target" };
   $("brand-sub").textContent = subs[t] || "";
   renderAll();
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -796,8 +813,8 @@ function delEntry(id) {
 
 /* ---- plan actions ---- */
 function applySplit(name) { plan = { splitName: name, days: (SPLITS[name] || []).map(n => ({ id: uid(), name: n, exercises: [] })) }; savePlan(); renderPlan(); }
-function addDay() { if (!plan.splitName) plan.splitName = "My split"; plan.days.push({ id: uid(), name: "New day", exercises: [] }); savePlan(); renderPlan(); const inputs = document.querySelectorAll(".plan-day-name"); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }
-function delDay(did) { const d = plan.days.find(x => x.id === did); if (!d) return; if (!confirm('Delete the "' + d.name + '" day?')) return; plan.days = plan.days.filter(x => x.id !== did); savePlan(); renderPlan(); }
+function addDay() { if (!plan.splitName) plan.splitName = "My workouts"; plan.days.push({ id: uid(), name: "New workout", exercises: [] }); savePlan(); renderPlan(); const inputs = document.querySelectorAll(".plan-day-name"); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }
+function delDay(did) { const d = plan.days.find(x => x.id === did); if (!d) return; if (!confirm('Delete "' + d.name + '"?')) return; plan.days = plan.days.filter(x => x.id !== did); savePlan(); renderPlan(); }
 function addPlanEx(did) {
   const d = plan.days.find(x => x.id === did); if (!d) return;
   const nameEl = document.querySelector('.plan-ex-name[data-did="' + did + '"]');
@@ -862,7 +879,8 @@ function onCardAction(e) {
   if (a === "toggle") toggleExpand(wid);
   else if (a === "start") startWorkout(btn.dataset.type);
   else if (a === "start-blank") startWorkout(valOf(".start-custom"));
-  else if (a === "start-plan") startFromPlan(did);
+  else if (a === "log-plan") logWorkoutFromPlan(did);
+  else if (a === "pd-toggle") { if (planCollapsed.has(did)) planCollapsed.delete(did); else planCollapsed.add(did); renderPlan(); }
   else if (a === "edit-type") { openChooserId = (openChooserId === wid ? null : wid); renderCards(); }
   else if (a === "set-type") setType(wid, btn.dataset.type);
   else if (a === "set-type-custom") setType(wid, valOf(".type-custom"));
@@ -1110,6 +1128,68 @@ function onCardioInput(e) {
   else if (t.classList.contains("cardio-hr")) cardioHrStr = t.value;
 }
 
+/* ---- guided log flow (step through a workout, one exercise at a time) ---- */
+function flowEntry() { const w = findWorkout(flowWid); if (!w) return null; return w.entries.find(x => x.id === flowIds[flowIdx]) || null; }
+function loadFlowStep() { const e = flowEntry(); if (!e) return; flowWeightStr = e.weight == null ? "" : String(e.weight); flowRepsStr = e.toFailure ? "" : repText(e); flowUnit = e.unit || "lb"; }
+function logWorkoutFromPlan(did) {
+  const d = plan.days.find(x => x.id === did); if (!d) return;
+  const w = ensureTodayWorkout(); w.type = d.name;
+  const ids = [];
+  d.exercises.forEach((pe, i) => {
+    const id = uid();
+    if (pe.kind === "cardio") { w.entries.push({ id: id, kind: "cardio", name: pe.name, minutes: pe.minutes || 0, distance: pe.distance || null, distUnit: pe.distUnit || "mi", calories: null, hr: null, ts: Date.now() + i }); }
+    else { const prev = lastEntryFor(pe.name, todayISO()); w.entries.push({ id: id, name: pe.name, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, toFailure: !!pe.toFailure, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); ids.push(id); }
+  });
+  save();
+  flowWid = w.id; flowIds = ids; flowIdx = 0;
+  if (flowIds.length) { loadFlowStep(); flowOpen = true; }
+  renderAll(); renderFlow();
+}
+function renderFlow() {
+  const box = $("logflow");
+  const e = flowOpen ? flowEntry() : null;
+  if (!e) { flowOpen = false; box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  const n = flowIds.length, i = flowIdx, w = findWorkout(flowWid);
+  const prev = lastEntryFor(e.name, w.date);
+  const lastRef = prev ? '<div class="flow-last">Last time: <b>' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + '</b></div>' : '<div class="flow-last">First time doing this</div>';
+  const target = e.toFailure ? (e.sets + " \u00d7 failure") : (e.sets + " \u00d7 " + repText(e));
+  const units = '<div class="seg"><button type="button" class="' + (flowUnit === "lb" ? "on" : "") + '" data-action="flow-unit" data-u="lb">lb</button><button type="button" class="' + (flowUnit === "kg" ? "on" : "") + '" data-action="flow-unit" data-u="kg">kg</button></div>';
+  const repsField = e.toFailure ? '<div class="pick-failinline">to failure</div>' : '<input type="text" class="num flow-reps" inputmode="numeric" value="' + esc(flowRepsStr) + '">';
+  const nextLabel = i < n - 1 ? "Next \u2192" : "Done";
+  const backBtn = i > 0 ? '<button class="icon-btn" data-action="flow-back" aria-label="Back">' + SVG.caretL + '</button>' : '<span style="width:34px"></span>';
+  const inner = '<div class="pick-head">' + backBtn + '<div class="pick-title">Exercise ' + (i + 1) + ' of ' + n + '</div><button class="icon-btn" data-action="flow-close" aria-label="Close">' + SVG.close + '</button></div>' +
+    '<div class="flow-name">' + esc(e.name) + '</div><div class="flow-target">Target \u00b7 ' + target + '</div>' + lastRef +
+    '<div class="flow-inputs"><div><div class="pick-lbl">Weight</div><input type="text" class="num flow-weight" inputmode="decimal" value="' + esc(flowWeightStr) + '" placeholder="\u2014"></div><div><div class="pick-lbl">Reps</div>' + repsField + '</div></div>' +
+    '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">Unit</span>' + units + '</div>' +
+    '<button class="btn-primary" data-action="flow-next">' + nextLabel + '</button>';
+  box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
+}
+function flowApply() {
+  const e = flowEntry(); if (!e) return;
+  const wv = flowWeightStr.trim();
+  if (wv === "") e.weight = null; else { const f = parseFloat(wv); if (Number.isFinite(f) && f >= 0) e.weight = f; }
+  e.unit = flowUnit;
+  if (!e.toFailure) { const rr = parseRepsField(flowRepsStr); if (rr) { e.reps = rr.reps; e.repMax = rr.repMax; e.toFailure = rr.toFailure; } }
+}
+function flowNext() { flowApply(); if (flowIdx < flowIds.length - 1) { flowIdx++; loadFlowStep(); renderFlow(); } else { save(); flowOpen = false; renderFlow(); renderAll(); } }
+function flowBack() { flowApply(); if (flowIdx > 0) { flowIdx--; loadFlowStep(); renderFlow(); } }
+function flowClose() { flowApply(); save(); flowOpen = false; renderFlow(); renderAll(); }
+function onFlowClick(e) {
+  if (e.target.id === "logflow") { flowClose(); return; }
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "flow-next") flowNext();
+  else if (a === "flow-back") flowBack();
+  else if (a === "flow-close") flowClose();
+  else if (a === "flow-unit") { flowUnit = btn.dataset.u; renderFlow(); }
+}
+function onFlowInput(e) {
+  const t = e.target;
+  if (t.classList.contains("flow-weight")) flowWeightStr = t.value;
+  else if (t.classList.contains("flow-reps")) flowRepsStr = t.value;
+}
+
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
 $("ex-name").addEventListener("input", updateHint);
@@ -1131,6 +1211,8 @@ $("editor").addEventListener("input", onEditorInput);
 $("cardio").addEventListener("click", onCardioClick);
 $("cardio").addEventListener("input", onCardioInput);
 $("add-cardio-btn").addEventListener("click", () => openCardio(null));
+$("logflow").addEventListener("click", onFlowClick);
+$("logflow").addEventListener("input", onFlowInput);
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
