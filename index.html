@@ -191,6 +191,7 @@
   .tab { flex: 1; appearance: none; background: transparent; border: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--dim); font-family: var(--font-ui); font-size: 11px; font-weight: 600; padding: 6px 0; border-radius: 10px; }
   .tab .ic { width: 22px; height: 22px; }
   .tab.on { color: var(--ink); }
+  #version { position: fixed; left: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); font-size: 10px; font-weight: 600; color: var(--dim); background: rgba(255,255,255,0.72); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; z-index: 40; pointer-events: none; font-variant-numeric: tabular-nums; }
 
   /* exercise picker */
   #picker, #editor, #cardio { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
@@ -353,6 +354,7 @@
   <div id="picker"></div>
   <div id="editor"></div>
   <div id="cardio"></div>
+  <div id="version">v15</div>
 
 <script>
 "use strict";
