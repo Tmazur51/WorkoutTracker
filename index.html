@@ -191,6 +191,24 @@
   .tab .ic { width: 22px; height: 22px; }
   .tab.on { color: var(--ink); }
 
+  /* exercise picker */
+  #picker { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  .pick-panel { background: var(--surface); width: 100%; max-width: 540px; border-radius: 20px 20px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
+  .pick-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
+  .pick-title { flex: 1; font-size: 17px; font-weight: 700; color: var(--text); text-align: center; }
+  .pick-head .icon-btn { color: var(--muted); }
+  .pick-list { display: flex; flex-direction: column; gap: 8px; }
+  .pick-item { appearance: none; display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; text-align: left; background: #FBFBF9; border: 1px solid var(--line); border-radius: 12px; padding: 14px; font-family: var(--font-ui); font-size: 15px; font-weight: 600; color: var(--text); cursor: pointer; }
+  .pick-item:hover { border-color: #CFCFC8; }
+  .pick-item .ic { color: var(--dim); }
+  .pick-item.custom { color: var(--muted); font-weight: 500; }
+  .pick-sub { font-size: 11px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); font-weight: 600; margin-bottom: 8px; }
+  .pick-sr { display: flex; align-items: center; gap: 10px; margin-bottom: 14px; }
+  .pick-sr input.num { max-width: 92px; min-height: 46px; }
+  .pick-x { color: var(--muted); font-size: 13px; }
+  .pick-preview { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
+  .pick-preview b { color: var(--text); font-weight: 600; }
+
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -296,6 +314,8 @@
     <button class="tab" data-tab="body"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg><span>Body</span></button>
   </div></nav>
 
+  <div id="picker"></div>
+
 <script>
 "use strict";
 
@@ -303,13 +323,81 @@ const LB = 2.20462;
 const DAY_TYPES = ["Push", "Pull", "Legs", "Upper", "Lower", "Full body"];
 const SPLITS = { "Push Pull Legs": ["Push", "Pull", "Legs"], "Upper / Lower": ["Upper", "Lower"], "Full Body": ["Full Body"], "Bro Split": ["Chest", "Back", "Shoulders", "Arms", "Legs"] };
 
+const CATALOG = {
+  Push: [
+    { m: "Bench Press", eq: ["Barbell", "Dumbbell", "Machine", "Smith machine"], va: ["Flat", "Incline", "Decline"] },
+    { m: "Overhead Press", eq: ["Barbell", "Dumbbell", "Machine"], va: ["Seated", "Standing"] },
+    { m: "Chest Fly", eq: ["Dumbbell", "Cable", "Machine"], va: ["Flat", "Incline"] },
+    { m: "Lateral Raise", eq: ["Dumbbell", "Cable", "Machine"], va: [] },
+    { m: "Front Raise", eq: ["Dumbbell", "Cable"], va: [] },
+    { m: "Triceps Pushdown", eq: ["Cable"], va: [] },
+    { m: "Overhead Triceps Extension", eq: ["Dumbbell", "Cable"], va: [] },
+    { m: "Dips", eq: ["Bodyweight", "Weighted", "Machine"], va: [] },
+    { m: "Push-up", eq: ["Bodyweight"], va: [] }
+  ],
+  Pull: [
+    { m: "Row", eq: ["Barbell", "Dumbbell", "Cable", "Machine"], va: ["Bent-over", "Seated", "Chest-supported"] },
+    { m: "Lat Pulldown", eq: ["Cable", "Machine"], va: ["Wide-grip", "Close-grip", "Neutral-grip"] },
+    { m: "Pull-up", eq: ["Bodyweight", "Weighted", "Assisted"], va: [] },
+    { m: "Chin-up", eq: ["Bodyweight", "Weighted", "Assisted"], va: [] },
+    { m: "Deadlift", eq: ["Barbell", "Dumbbell", "Trap bar"], va: ["Conventional", "Romanian", "Sumo", "Stiff-leg"] },
+    { m: "Biceps Curl", eq: ["Barbell", "Dumbbell", "Cable", "Machine"], va: ["Standard", "Hammer", "Preacher"] },
+    { m: "Face Pull", eq: ["Cable"], va: [] },
+    { m: "Rear Delt Fly", eq: ["Dumbbell", "Cable", "Machine"], va: [] },
+    { m: "Shrug", eq: ["Barbell", "Dumbbell", "Machine"], va: [] }
+  ],
+  Legs: [
+    { m: "Squat", eq: ["Barbell", "Dumbbell", "Smith machine", "Machine"], va: ["Back", "Front", "Goblet"] },
+    { m: "Leg Press", eq: ["Machine"], va: [] },
+    { m: "Lunge", eq: ["Dumbbell", "Barbell", "Bodyweight"], va: ["Walking", "Reverse", "Bulgarian split"] },
+    { m: "Romanian Deadlift", eq: ["Barbell", "Dumbbell"], va: [] },
+    { m: "Leg Curl", eq: ["Machine"], va: ["Seated", "Lying"] },
+    { m: "Leg Extension", eq: ["Machine"], va: [] },
+    { m: "Hip Thrust", eq: ["Barbell", "Machine"], va: [] },
+    { m: "Calf Raise", eq: ["Machine", "Dumbbell", "Smith machine"], va: ["Standing", "Seated"] }
+  ],
+  Core: [
+    { m: "Plank", eq: ["Bodyweight", "Weighted"], va: [] },
+    { m: "Crunch", eq: ["Bodyweight", "Cable", "Machine"], va: [] },
+    { m: "Leg Raise", eq: ["Bodyweight"], va: ["Hanging", "Lying"] },
+    { m: "Russian Twist", eq: ["Bodyweight", "Weighted"], va: [] },
+    { m: "Cable Woodchop", eq: ["Cable"], va: [] }
+  ]
+};
+function dayCategory(name) {
+  const n = (name || "").toLowerCase();
+  if (/push|chest|shoulder|tricep/.test(n)) return "Push";
+  if (/pull|back|bicep/.test(n)) return "Pull";
+  if (/leg|lower|quad|glute|calf|hamstring/.test(n)) return "Legs";
+  if (/core|abs?\b/.test(n)) return "Core";
+  return "All";
+}
+function pickerMovementsFor(cat) {
+  const out = [];
+  const cats = cat === "All" ? ["Push", "Pull", "Legs", "Core"] : [cat];
+  cats.forEach(c => (CATALOG[c] || []).forEach((it, idx) => out.push({ m: it.m, cat: c, idx })));
+  return out;
+}
+function composeName() {
+  if (pickerMovement && pickerMovement.custom) return pickerCustomName.trim();
+  if (!pickerMovement) return "";
+  const parts = [];
+  if (pickerVar) parts.push(pickerVar);
+  if (pickerEquip && pickerEquip !== "Bodyweight") parts.push(pickerEquip);
+  parts.push(pickerMovement.m);
+  return parts.join(" ");
+}
+
 const SVG = {
   dumbbell: '<svg class="ic ic-lg" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg>',
   calSm: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 3v3.5"/><path d="M16 3v3.5"/></svg>',
   dbSm: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg>',
   caret: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
   pencil: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20h4L18.5 9.5l-4-4L4 16z"/><path d="M13.5 6.5l4 4"/></svg>',
-  trash: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/></svg>'
+  trash: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/></svg>',
+  caretR: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
+  caretL: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
+  close: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>'
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -341,6 +429,7 @@ if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 
 let activeTab = "log";
 let editingId = null, editUnit = "lb", openChooserId = null, exUnit = "lb", chartSel = "__bw__";
+let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepsStr = "8", pickerCustomName = "";
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -474,7 +563,7 @@ function planExHTML(d, pe) {
 function planDayHTML(d) {
   const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises planned yet.</div>';
   return '<div class="wk-card"><div class="plan-day-head"><input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete day">' + SVG.trash + '</button></div>' + rows +
-    '<div class="plan-addrow"><input type="text" class="plan-ex-name" data-did="' + d.id + '" placeholder="Exercise" list="ex-list"><div class="plan-addrow2"><input type="text" class="num plan-ex-sets" data-did="' + d.id + '" inputmode="numeric" placeholder="sets"><input type="text" class="num plan-ex-reps" data-did="' + d.id + '" inputmode="numeric" placeholder="reps"><button class="btn-save" data-action="add-plan-ex" data-did="' + d.id + '">Add</button></div></div></div>';
+    '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
 }
 function renderPlan() {
   const box = $("plan-content");
@@ -694,11 +783,74 @@ function onCardAction(e) {
   else if (a === "split-preset") applySplit(btn.dataset.split);
   else if (a === "add-day") addDay();
   else if (a === "del-day") delDay(did);
-  else if (a === "add-plan-ex") addPlanEx(did);
+  else if (a === "open-picker") openPicker(did);
   else if (a === "del-plan-ex") delPlanEx(did, btn.dataset.eid);
   else if (a === "reset-plan") resetPlan();
 }
 function onPlanChange(e) { const el = e.target.closest('[data-action="rename-day"]'); if (el) renameDay(el.dataset.did, el.value); }
+
+/* ---- exercise picker ---- */
+function openPicker(did) { const d = plan.days.find(x => x.id === did); pickerDay = did; pickerCat = dayCategory(d ? d.name : ""); pickerMovement = null; renderPicker(); }
+function pickerAdd() {
+  const d = plan.days.find(x => x.id === pickerDay); if (!d) return;
+  const name = composeName();
+  if (!name) { const el = document.querySelector(".picker-custom-name"); if (el) el.focus(); return; }
+  const sets = parseInt(pickerSetsStr, 10), reps = parseInt(pickerRepsStr, 10);
+  if (!Number.isFinite(sets) || sets <= 0 || !Number.isFinite(reps) || reps <= 0) { alert("Sets and reps should be whole numbers."); return; }
+  d.exercises.push({ id: uid(), name, sets, reps });
+  savePlan(); pickerMovement = null; renderPlan(); renderPicker();
+}
+function renderPicker() {
+  const box = $("picker");
+  const d = pickerDay ? plan.days.find(x => x.id === pickerDay) : null;
+  if (!d) { pickerDay = null; box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  let inner = "";
+  if (!pickerMovement) {
+    const cats = ["Push", "Pull", "Legs", "Core", "All"];
+    const catChips = cats.map(c => '<button class="chip-btn' + (pickerCat === c ? " on" : "") + '" data-action="picker-cat" data-cat="' + c + '">' + c + '</button>').join("");
+    const list = pickerMovementsFor(pickerCat).map(it => '<button class="pick-item" data-action="picker-move" data-cat="' + it.cat + '" data-idx="' + it.idx + '"><span>' + esc(it.m) + '</span>' + SVG.caretR + '</button>').join("");
+    inner = '<div class="pick-head"><span style="width:34px"></span><div class="pick-title">Add to ' + esc(d.name) + '</div><button class="icon-btn" data-action="picker-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<div class="chips" style="margin-bottom:14px;">' + catChips + '</div>' +
+      '<div class="pick-list">' + list + '<button class="pick-item custom" data-action="picker-custom"><span>Custom exercise\u2026</span>' + SVG.caretR + '</button></div>';
+  } else {
+    const isCustom = !!pickerMovement.custom;
+    let controls = "";
+    if (isCustom) {
+      controls += '<input type="text" class="picker-custom-name" placeholder="Exercise name" value="' + esc(pickerCustomName) + '" style="margin-bottom:14px;">';
+    } else {
+      if (pickerMovement.eq && pickerMovement.eq.length) controls += '<div class="pick-sub">Equipment</div><div class="chips" style="margin-bottom:14px;">' + pickerMovement.eq.map(x => '<button class="chip-btn' + (pickerEquip === x ? " on" : "") + '" data-action="picker-equip" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div>';
+      if (pickerMovement.va && pickerMovement.va.length) controls += '<div class="pick-sub">Variation <span style="text-transform:none;font-weight:400;color:var(--dim)">(optional)</span></div><div class="chips" style="margin-bottom:14px;">' + pickerMovement.va.map(x => '<button class="chip-btn' + (pickerVar === x ? " on" : "") + '" data-action="picker-var" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div>';
+    }
+    const preview = isCustom ? "" : '<div class="pick-preview">Adds: <b>' + esc(composeName()) + '</b></div>';
+    const title = isCustom ? "Custom exercise" : esc(pickerMovement.m);
+    inner = '<div class="pick-head"><button class="icon-btn" data-action="picker-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">' + title + '</div><button class="icon-btn" data-action="picker-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      controls +
+      '<div class="pick-sub">Sets &amp; reps</div><div class="pick-sr"><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"><span class="pick-x">sets \u00d7</span><input type="text" class="num picker-reps" inputmode="numeric" value="' + esc(pickerRepsStr) + '"><span class="pick-x">reps</span></div>' +
+      preview +
+      '<button class="btn-primary" data-action="picker-add">Add to ' + esc(d.name) + '</button>';
+  }
+  box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
+}
+function onPickerClick(e) {
+  if (e.target.id === "picker") { pickerDay = null; renderPicker(); return; }
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "picker-close") { pickerDay = null; renderPicker(); }
+  else if (a === "picker-cat") { pickerCat = btn.dataset.cat; renderPicker(); }
+  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepsStr = "8"; renderPicker(); }
+  else if (a === "picker-custom") { pickerMovement = { custom: true }; pickerEquip = null; pickerVar = null; pickerCustomName = ""; pickerSetsStr = "3"; pickerRepsStr = "8"; renderPicker(); }
+  else if (a === "picker-back") { pickerMovement = null; renderPicker(); }
+  else if (a === "picker-equip") { pickerEquip = btn.dataset.v; renderPicker(); }
+  else if (a === "picker-var") { pickerVar = (pickerVar === btn.dataset.v ? null : btn.dataset.v); renderPicker(); }
+  else if (a === "picker-add") { pickerAdd(); }
+}
+function onPickerInput(e) {
+  const t = e.target;
+  if (t.classList.contains("picker-sets")) pickerSetsStr = t.value;
+  else if (t.classList.contains("picker-reps")) pickerRepsStr = t.value;
+  else if (t.classList.contains("picker-custom-name")) pickerCustomName = t.value;
+}
 
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
@@ -708,6 +860,8 @@ $("today-workout").addEventListener("click", onCardAction);
 $("log").addEventListener("click", onCardAction);
 $("plan-content").addEventListener("click", onCardAction);
 $("plan-content").addEventListener("change", onPlanChange);
+$("picker").addEventListener("click", onPickerClick);
+$("picker").addEventListener("input", onPickerInput);
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
