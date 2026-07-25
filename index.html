@@ -225,6 +225,8 @@
   .drag-handle:active { cursor: grabbing; }
   .plan-ex { touch-action: pan-y; }
   .plan-ex.dragging { opacity: 0.9; background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
+  .plan-ex-edit { background: #F1F1EC; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; margin-bottom: 7px; }
+  .plan-ex-edit .pe-ed-name { margin-bottom: 8px; }
 
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
@@ -452,6 +454,7 @@ let activeTab = "log";
 let editingId = null, editUnit = "lb", openChooserId = null, exUnit = "lb", chartSel = "__bw__";
 let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepLowStr = "8", pickerRepHighStr = "", pickerCustomName = "";
 let editorWid = null;
+let editPlanId = null;
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -586,13 +589,14 @@ function startPromptHTML() {
 }
 
 /* ---- plan html ---- */
-function planExHTML(d, pe, idx, total) {
-  const up = idx > 0 ? '<button class="icon-btn" data-action="pe-up" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Move up">' + SVG.up + '</button>' : '<span class="icon-btn" style="visibility:hidden"></span>';
-  const down = idx < total - 1 ? '<button class="icon-btn" data-action="pe-down" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Move down">' + SVG.down + '</button>' : '<span class="icon-btn" style="visibility:hidden"></span>';
-  return '<div class="plan-ex"><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span>' + up + down + '<button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
+function planExHTML(d, pe) {
+  if (editPlanId === pe.id) {
+    return '<div class="plan-ex-edit"><input type="text" class="pe-ed-name" value="' + esc(pe.name) + '"><div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num pe-ed-sets" inputmode="numeric" value="' + pe.sets + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num pe-ed-replow" inputmode="numeric" value="' + pe.reps + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num pe-ed-rephigh" inputmode="numeric" value="' + (pe.repMax || "") + '" placeholder="\u2014"></div></div><div class="ed-actions"><button class="btn-mini save" data-action="pe-editsave" data-did="' + d.id + '" data-eid="' + pe.id + '">Save</button><button class="btn-mini cancel" data-action="pe-editcancel">Cancel</button></div></div>';
+  }
+  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn" data-action="pe-edit" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
-  const rows = d.exercises.length ? d.exercises.map((pe, i) => planExHTML(d, pe, i, d.exercises.length)).join("") : '<div class="empty small">No exercises planned yet.</div>';
+  const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises planned yet.</div>';
   return '<div class="wk-card"><div class="plan-day-head"><input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete day">' + SVG.trash + '</button></div>' +
     '<div class="plan-ex-list" data-did="' + d.id + '">' + rows + '</div>' +
     '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
@@ -817,8 +821,9 @@ function onCardAction(e) {
   else if (a === "del-day") delDay(did);
   else if (a === "open-picker") openPicker(did);
   else if (a === "del-plan-ex") delPlanEx(did, btn.dataset.eid);
-  else if (a === "pe-up") moveEx(did, btn.dataset.eid, -1);
-  else if (a === "pe-down") moveEx(did, btn.dataset.eid, 1);
+  else if (a === "pe-edit") { editPlanId = btn.dataset.eid; renderPlan(); }
+  else if (a === "pe-editsave") savePlanEx(did, btn.dataset.eid);
+  else if (a === "pe-editcancel") { editPlanId = null; renderPlan(); }
   else if (a === "edit-workout") openEditor(wid);
   else if (a === "reset-plan") resetPlan();
 }
@@ -888,42 +893,46 @@ function onPickerInput(e) {
   else if (t.classList.contains("picker-custom-name")) pickerCustomName = t.value;
 }
 
-/* ---- drag to reorder planned exercises (works with touch + mouse) ---- */
-let dragState = null;
-function onPointerDown(e) {
+/* ---- drag to reorder planned exercises (touch + mouse) ---- */
+let drag = null;
+function dragBegin(clientY, row, list) { drag = { row: row, list: list }; row.classList.add("dragging"); }
+function dragTo(clientY) {
+  if (!drag) return;
+  const row = drag.row, list = drag.list;
+  const sibs = [].slice.call(list.querySelectorAll(".plan-ex")).filter(el => el !== row);
+  let placed = false;
+  for (const sib of sibs) { const r = sib.getBoundingClientRect(); if (clientY < r.top + r.height / 2) { list.insertBefore(row, sib); placed = true; break; } }
+  if (!placed) list.appendChild(row);
+}
+function dragFinish() {
+  if (!drag) return;
+  const row = drag.row, list = drag.list;
+  row.classList.remove("dragging");
+  const d = plan.days.find(x => x.id === list.dataset.did);
+  if (d) { const order = [].slice.call(list.querySelectorAll(".plan-ex")).map(el => el.dataset.eid); d.exercises.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); savePlan(); }
+  drag = null;
+  renderPlan();
+}
+function onTouchStart(e) {
   const handle = e.target.closest("[data-handle]"); if (!handle) return;
   const row = handle.closest(".plan-ex"); if (!row) return;
   const list = row.closest(".plan-ex-list"); if (!list) return;
   e.preventDefault();
-  dragState = { row: row, list: list, handle: handle, pointerId: e.pointerId };
-  row.classList.add("dragging");
-  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
-  handle.addEventListener("pointermove", onPointerMove);
-  handle.addEventListener("pointerup", onPointerUp);
-  handle.addEventListener("pointercancel", onPointerUp);
+  dragBegin(e.touches[0].clientY, row, list);
 }
-function onPointerMove(e) {
-  if (!dragState) return;
+function onTouchMove(e) { if (!drag) return; e.preventDefault(); dragTo(e.touches[0].clientY); }
+function onTouchEnd() { if (drag) dragFinish(); }
+function onMouseDown(e) {
+  const handle = e.target.closest("[data-handle]"); if (!handle) return;
+  const row = handle.closest(".plan-ex"); if (!row) return;
+  const list = row.closest(".plan-ex-list"); if (!list) return;
   e.preventDefault();
-  const row = dragState.row, list = dragState.list, y = e.clientY;
-  const sibs = [].slice.call(list.querySelectorAll(".plan-ex")).filter(el => el !== row);
-  let placed = false;
-  for (const sib of sibs) { const r = sib.getBoundingClientRect(); if (y < r.top + r.height / 2) { list.insertBefore(row, sib); placed = true; break; } }
-  if (!placed) list.appendChild(row);
+  dragBegin(e.clientY, row, list);
+  document.addEventListener("mousemove", onMouseMove);
+  document.addEventListener("mouseup", onMouseUp);
 }
-function onPointerUp() {
-  if (!dragState) return;
-  const row = dragState.row, list = dragState.list, handle = dragState.handle, pid = dragState.pointerId;
-  row.classList.remove("dragging");
-  try { handle.releasePointerCapture(pid); } catch (err) {}
-  handle.removeEventListener("pointermove", onPointerMove);
-  handle.removeEventListener("pointerup", onPointerUp);
-  handle.removeEventListener("pointercancel", onPointerUp);
-  const d = plan.days.find(x => x.id === list.dataset.did);
-  if (d) { const order = [].slice.call(list.querySelectorAll(".plan-ex")).map(el => el.dataset.eid); d.exercises.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); savePlan(); }
-  dragState = null;
-  renderPlan();
-}
+function onMouseMove(e) { if (!drag) return; e.preventDefault(); dragTo(e.clientY); }
+function onMouseUp() { dragFinish(); document.removeEventListener("mousemove", onMouseMove); document.removeEventListener("mouseup", onMouseUp); }
 
 /* ---- reorder planned exercises ---- */
 function moveEx(did, eid, dir) {
@@ -932,6 +941,17 @@ function moveEx(did, eid, dir) {
   const j = i + dir; if (j < 0 || j >= d.exercises.length) return;
   const tmp = d.exercises[i]; d.exercises[i] = d.exercises[j]; d.exercises[j] = tmp;
   savePlan(); renderPlan();
+}
+function savePlanEx(did, eid) {
+  const d = plan.days.find(x => x.id === did); if (!d) return;
+  const pe = d.exercises.find(x => x.id === eid); if (!pe) return;
+  const name = valOf(".pe-ed-name");
+  const sets = parseInt((document.querySelector(".pe-ed-sets") || {}).value, 10);
+  const rr = parseRepsPair((document.querySelector(".pe-ed-replow") || {}).value, (document.querySelector(".pe-ed-rephigh") || {}).value);
+  if (!name) { alert("Give the exercise a name."); return; }
+  if (!Number.isFinite(sets) || sets <= 0 || !rr) { alert("Enter whole-number sets and reps."); return; }
+  pe.name = name; pe.sets = sets; pe.reps = rr.reps; pe.repMax = rr.repMax;
+  editPlanId = null; savePlan(); renderPlan();
 }
 
 /* ---- edit-workout overlay ---- */
@@ -984,7 +1004,11 @@ $("plan-content").addEventListener("click", onCardAction);
 $("plan-content").addEventListener("change", onPlanChange);
 $("picker").addEventListener("click", onPickerClick);
 $("picker").addEventListener("input", onPickerInput);
-$("plan-content").addEventListener("pointerdown", onPointerDown);
+$("plan-content").addEventListener("touchstart", onTouchStart, { passive: false });
+$("plan-content").addEventListener("touchmove", onTouchMove, { passive: false });
+$("plan-content").addEventListener("touchend", onTouchEnd);
+$("plan-content").addEventListener("touchcancel", onTouchEnd);
+$("plan-content").addEventListener("mousedown", onMouseDown);
 $("editor").addEventListener("click", onEditorClick);
 $("editor").addEventListener("input", onEditorInput);
 
