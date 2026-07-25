@@ -193,7 +193,7 @@
   .tab.on { color: var(--ink); }
 
   /* exercise picker */
-  #picker, #editor { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  #picker, #editor, #cardio { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
   .pick-panel { background: var(--surface); width: 100%; max-width: 540px; border-radius: 20px 20px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
   .pick-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
   .pick-title { flex: 1; font-size: 17px; font-weight: 700; color: var(--text); text-align: center; }
@@ -222,6 +222,12 @@
   .pick-failsets input.num { width: 100%; min-height: 46px; }
   .pick-failnote { color: var(--muted); font-size: 13px; padding-bottom: 13px; }
   .pick-failinline { min-height: 46px; display: flex; align-items: center; color: var(--orange); font-weight: 600; font-size: 14px; }
+  .cardio-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 12px; }
+  .cardio-grid input.num { width: 100%; min-height: 46px; }
+  .cardio-stats { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 13.5px; font-variant-numeric: tabular-nums; }
+  .cardio-stats b { color: var(--text); font-weight: 700; }
+  .cardio-stats .ic { color: var(--orange); }
+  .chip.cardio-chip { color: var(--blue); background: var(--blue-bg); }
   .ed-card { background: #FBFBF9; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; margin-bottom: 10px; }
   .ed-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
   .ed-nm { font-size: 15px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -279,6 +285,7 @@
           <div class="hint" id="hint"></div>
           <button type="submit" class="btn-primary"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add to workout</button>
         </form>
+        <button class="btn-ghost wide" id="add-cardio-btn" style="margin-top:10px;">+ Add cardio</button>
       </section>
 
       <section class="section">
@@ -345,12 +352,14 @@
 
   <div id="picker"></div>
   <div id="editor"></div>
+  <div id="cardio"></div>
 
 <script>
 "use strict";
 
 const LB = 2.20462;
 const DAY_TYPES = ["Push", "Pull", "Legs", "Upper", "Lower", "Full body"];
+const CARDIO_ACTS = ["Running", "Cycling", "Stationary Bike", "Swimming", "Rowing", "Elliptical", "Walking", "Stair Climber", "Hiking"];
 const SPLITS = { "Push Pull Legs": ["Push", "Pull", "Legs"], "Upper / Lower": ["Upper", "Lower"], "Full Body": ["Full Body"], "Bro Split": ["Chest", "Back", "Shoulders", "Arms", "Legs"] };
 
 const CATALOG = {
@@ -431,7 +440,8 @@ const SVG = {
   close: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>',
   grip: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>',
   up: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
-  down: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
+  down: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>',
+  pulse: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12h4l2.5 7 5-16 2.5 9H22"/></svg>'
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -467,6 +477,7 @@ let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = nu
 let editorWid = null;
 let editPlanId = null;
 let pickerFail = false, peEditFail = false, addFail = false;
+let cardioOpen = false, cardioEditId = null, cardioAct = "Cycling", cardioMinStr = "", cardioDistStr = "", cardioUnit = "mi", cardioCalStr = "", cardioHrStr = "";
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -553,7 +564,18 @@ function currentSeries() {
 }
 
 /* ---- log/workout html ---- */
+function cardioStatsText(e) {
+  const parts = ['<b>' + (e.minutes || 0) + ' min</b>'];
+  if (e.distance) parts.push(e.distance + " " + (e.distUnit || "mi"));
+  if (e.distance && e.minutes && (e.distUnit === "mi" || e.distUnit === "km")) { const spd = round1(e.distance / (e.minutes / 60)); parts.push(spd + (e.distUnit === "km" ? " km/h" : " mph")); }
+  if (e.calories) parts.push(e.calories + " cal");
+  if (e.hr) parts.push(e.hr + " bpm");
+  return parts.join(" \u00b7 ");
+}
 function entryDisplayHTML(w, e) {
+  if (e.kind === "cardio") {
+    return '<div class="entry"><div class="entry-top"><div class="entry-name">' + esc(e.name) + '</div><div class="entry-right"><span class="chip cardio-chip">cardio</span><button class="icon-btn" data-action="cardio-edit" data-id="' + e.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-ex" data-id="' + e.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div><div class="cardio-stats">' + SVG.pulse + ' ' + cardioStatsText(e) + '</div></div>';
+  }
   const prev = lastEntryFor(e.name, w.date);
   const d = computeDelta(e, prev);
   const chip = d ? '<span class="chip ' + d.dir + '">' + esc(d.text) + '</span>' : "";
@@ -585,11 +607,13 @@ function workoutCardHTML(w) {
   if (expanded) {
     const chooser = openChooserId === w.id ? typeChooserHTML(w) : '<button class="link-btn change" data-action="edit-type" data-wid="' + w.id + '">' + SVG.pencil + ' Change day label</button>';
     const rows = w.entries.length ? w.entries.map(e => entryDisplayHTML(w, e)).join("") : '<div class="empty small">No exercises yet.' + (isToday ? " Add one below." : "") + '</div>';
-    let rLow = 0, rHigh = 0; w.entries.forEach(e => { if (e.toFailure) return; const hi = e.repMax || e.reps; rLow += (e.sets || 0) * e.reps; rHigh += (e.sets || 0) * hi; });
+    let rLow = 0, rHigh = 0, cMin = 0, cCal = 0; w.entries.forEach(e => { if (e.kind === "cardio") { cMin += (e.minutes || 0); cCal += (e.calories || 0); return; } if (e.toFailure) return; const hi = e.repMax || e.reps; rLow += (e.sets || 0) * e.reps; rHigh += (e.sets || 0) * hi; });
     const repsStr = rHigh > rLow ? (rLow + "-" + rHigh) : ("" + rLow);
-    const repsPart = rHigh > 0 ? (" \u00b7 " + repsStr + " reps") : "";
-    const totalLine = w.entries.length ? '<div class="wk-total">Total \u00b7 ' + totalSets + ' sets' + repsPart + '</div>' : "";
-    const editBtn = w.entries.length ? '<button class="btn-ghost wide" data-action="edit-workout" data-wid="' + w.id + '" style="margin-top:2px;">Edit weights &amp; reps</button>' : "";
+    const tParts = [];
+    if (w.entries.some(e => e.kind !== "cardio")) { let s = totalSets + " sets"; if (rHigh > 0) s += " \u00b7 " + repsStr + " reps"; tParts.push(s); }
+    if (cMin > 0) { let c = cMin + " min"; if (cCal > 0) c += " \u00b7 " + cCal + " cal"; tParts.push(c); }
+    const totalLine = w.entries.length && tParts.length ? '<div class="wk-total">Total \u00b7 ' + tParts.join(" \u00b7 ") + '</div>' : "";
+    const editBtn = w.entries.some(e => e.kind !== "cardio") ? '<button class="btn-ghost wide" data-action="edit-workout" data-wid="' + w.id + '" style="margin-top:2px;">Edit weights &amp; reps</button>' : "";
     bodyHtml = '<div class="wk-body">' + chooser + rows + totalLine + editBtn + '<div class="wk-foot"><button class="link-btn danger" data-action="del-workout" data-wid="' + w.id + '">' + SVG.trash + ' Delete workout</button></div></div>';
   }
   return '<div class="wk-card">' + main + bodyHtml + '</div>';
@@ -843,6 +867,7 @@ function onCardAction(e) {
   else if (a === "save-ex") saveEdit(id);
   else if (a === "cancel-ex") { editingId = null; renderCards(); }
   else if (a === "del-ex") delEntry(id);
+  else if (a === "cardio-edit") openCardio(id);
   else if (a === "ed-unit") { editUnit = btn.dataset.u; renderCards(); }
   else if (a === "split-preset") applySplit(btn.dataset.split);
   else if (a === "add-day") addDay();
@@ -1005,7 +1030,8 @@ function renderEditor() {
   if (!w) { editorWid = null; box.style.display = "none"; box.innerHTML = ""; return; }
   box.style.display = "flex";
   const title = w.type ? esc(w.type) : "Workout";
-  const rows = w.entries.length ? w.entries.map(e => editorRowHTML(w, e)).join("") : '<div class="empty small">No exercises. Add some from the Log page.</div>';
+  const strength = w.entries.filter(e => e.kind !== "cardio");
+  const rows = strength.length ? strength.map(e => editorRowHTML(w, e)).join("") : '<div class="empty small">No strength exercises to edit.</div>';
   box.innerHTML = '<div class="pick-panel"><div class="pick-head"><span style="width:34px"></span><div class="pick-title">Edit \u00b7 ' + title + '</div><button class="icon-btn" data-action="editor-close" aria-label="Close">' + SVG.close + '</button></div>' + rows + '<button class="btn-primary" data-action="editor-close" style="margin-top:6px;">Done</button></div>';
 }
 function editorDel(id) {
@@ -1030,6 +1056,55 @@ function onEditorInput(e) {
   else if (field === "sets") { const s = parseInt(el.value, 10); if (Number.isFinite(s) && s > 0) c.e.sets = s; }
 }
 
+/* ---- cardio sheet (add + edit) ---- */
+function openCardio(id) {
+  if (id) { const c = findEntryCtx(id); if (!c || c.e.kind !== "cardio") return; const e = c.e; cardioEditId = id; cardioAct = e.name; cardioMinStr = e.minutes ? String(e.minutes) : ""; cardioDistStr = e.distance != null ? String(e.distance) : ""; cardioUnit = e.distUnit || "mi"; cardioCalStr = e.calories != null ? String(e.calories) : ""; cardioHrStr = e.hr != null ? String(e.hr) : ""; }
+  else { cardioEditId = null; cardioAct = "Cycling"; cardioMinStr = ""; cardioDistStr = ""; cardioUnit = "mi"; cardioCalStr = ""; cardioHrStr = ""; }
+  cardioOpen = true; renderCardio();
+}
+function renderCardio() {
+  const box = $("cardio");
+  if (!cardioOpen) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  const acts = CARDIO_ACTS.map(a => '<button class="chip-btn' + (cardioAct === a ? " on" : "") + '" data-action="cardio-act" data-a="' + esc(a) + '">' + esc(a) + '</button>').join("");
+  const units = ["mi", "km", "m"].map(u => '<button type="button" class="' + (cardioUnit === u ? "on" : "") + '" data-action="cardio-unit" data-u="' + u + '">' + u + '</button>').join("");
+  const inner = '<div class="pick-head"><span style="width:34px"></span><div class="pick-title">' + (cardioEditId ? "Edit cardio" : "Add cardio") + '</div><button class="icon-btn" data-action="cardio-close" aria-label="Close">' + SVG.close + '</button></div>' +
+    '<div class="pick-sub">Activity</div><div class="chips" style="margin-bottom:16px;">' + acts + '</div>' +
+    '<div class="cardio-grid"><div><div class="pick-lbl">Duration (min)</div><input type="text" class="num cardio-min" inputmode="numeric" value="' + esc(cardioMinStr) + '" placeholder="30"></div>' +
+    '<div><div class="pick-lbl">Calories <span class="opt">(opt)</span></div><input type="text" class="num cardio-cal" inputmode="numeric" value="' + esc(cardioCalStr) + '" placeholder="\u2014"></div>' +
+    '<div><div class="pick-lbl">Distance <span class="opt">(opt)</span></div><input type="text" class="num cardio-dist" inputmode="decimal" value="' + esc(cardioDistStr) + '" placeholder="\u2014"></div>' +
+    '<div><div class="pick-lbl">Avg HR <span class="opt">(opt)</span></div><input type="text" class="num cardio-hr" inputmode="numeric" value="' + esc(cardioHrStr) + '" placeholder="\u2014"></div></div>' +
+    '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">Distance unit</span><div class="seg">' + units + '</div></div>' +
+    '<button class="btn-primary" data-action="cardio-save" style="margin-top:8px;">' + (cardioEditId ? "Save" : "Add to workout") + '</button>';
+  box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
+}
+function cardioSave() {
+  const min = parseInt(cardioMinStr, 10);
+  if (!Number.isFinite(min) || min <= 0) { alert("Enter the duration in minutes."); return; }
+  const dist = cardioDistStr.trim() === "" ? null : (Number.isFinite(parseFloat(cardioDistStr)) && parseFloat(cardioDistStr) > 0 ? parseFloat(cardioDistStr) : null);
+  const cal = cardioCalStr.trim() === "" ? null : (Number.isFinite(parseInt(cardioCalStr, 10)) && parseInt(cardioCalStr, 10) >= 0 ? parseInt(cardioCalStr, 10) : null);
+  const hr = cardioHrStr.trim() === "" ? null : (Number.isFinite(parseInt(cardioHrStr, 10)) && parseInt(cardioHrStr, 10) > 0 ? parseInt(cardioHrStr, 10) : null);
+  if (cardioEditId) { const c = findEntryCtx(cardioEditId); if (c) Object.assign(c.e, { name: cardioAct, minutes: min, distance: dist, distUnit: cardioUnit, calories: cal, hr: hr }); }
+  else { ensureTodayWorkout().entries.push({ id: uid(), kind: "cardio", name: cardioAct, minutes: min, distance: dist, distUnit: cardioUnit, calories: cal, hr: hr, ts: Date.now() }); }
+  save(); cardioOpen = false; cardioEditId = null; renderCardio(); renderAll();
+}
+function onCardioClick(e) {
+  if (e.target.id === "cardio") { cardioOpen = false; renderCardio(); return; }
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "cardio-close") { cardioOpen = false; renderCardio(); }
+  else if (a === "cardio-act") { cardioAct = btn.dataset.a; renderCardio(); }
+  else if (a === "cardio-unit") { cardioUnit = btn.dataset.u; renderCardio(); }
+  else if (a === "cardio-save") cardioSave();
+}
+function onCardioInput(e) {
+  const t = e.target;
+  if (t.classList.contains("cardio-min")) cardioMinStr = t.value;
+  else if (t.classList.contains("cardio-dist")) cardioDistStr = t.value;
+  else if (t.classList.contains("cardio-cal")) cardioCalStr = t.value;
+  else if (t.classList.contains("cardio-hr")) cardioHrStr = t.value;
+}
+
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
 $("ex-name").addEventListener("input", updateHint);
@@ -1048,6 +1123,9 @@ $("plan-content").addEventListener("touchcancel", onTouchEnd);
 $("plan-content").addEventListener("mousedown", onMouseDown);
 $("editor").addEventListener("click", onEditorClick);
 $("editor").addEventListener("input", onEditorInput);
+$("cardio").addEventListener("click", onCardioClick);
+$("cardio").addEventListener("input", onCardioInput);
+$("add-cardio-btn").addEventListener("click", () => openCardio(null));
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
