@@ -108,7 +108,7 @@
   .wk-pill { font-size: 11.5px; font-weight: 600; padding: 3px 10px; border-radius: 999px; white-space: nowrap; flex-shrink: 0; }
   .wk-pill.pill-today { background: var(--green-bg); color: var(--green); }
   .wk-pill.pill-muted { background: var(--surface-2); color: var(--muted); }
-  .wk-meta { display: flex; align-items: center; gap: 6px; color: var(--muted); font-size: 12.5px; margin-top: 5px; font-variant-numeric: tabular-nums; }
+  .wk-meta { display: flex; align-items: center; flex-wrap: wrap; gap: 6px; color: var(--muted); font-size: 12.5px; margin-top: 5px; font-variant-numeric: tabular-nums; }
   .wk-meta .mdot { color: var(--dim); }
   .wk-caret { color: var(--dim); transition: transform 0.15s ease; flex-shrink: 0; }
   .wk-caret.open { transform: rotate(180deg); }
@@ -208,6 +208,10 @@
   .pick-x { color: var(--muted); font-size: 13px; }
   .pick-preview { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
   .pick-preview b { color: var(--text); font-weight: 600; }
+  .pick-srgrid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 10px; margin-bottom: 14px; }
+  .pick-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
+  .pick-lbl .opt { text-transform: none; letter-spacing: 0; color: var(--dim); font-weight: 400; }
+  .pick-srgrid input.num { width: 100%; min-height: 46px; }
 
   /* drag to reorder */
   .plan-ex-list { display: flex; flex-direction: column; }
@@ -437,7 +441,7 @@ if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 
 let activeTab = "log";
 let editingId = null, editUnit = "lb", openChooserId = null, exUnit = "lb", chartSel = "__bw__";
-let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepsStr = "8", pickerCustomName = "";
+let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepLowStr = "8", pickerRepHighStr = "", pickerCustomName = "";
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -481,13 +485,17 @@ function computeDelta(cur, prev) {
   if (!prev) return null;
   const cw = cur.weight, pw = prev.weight;
   if (cw != null && pw != null) { if (cw > pw) return { dir: "up", text: "+" + round1(cw - pw) + " " + cur.unit }; if (cw < pw) return { dir: "down", text: "\u2212" + round1(pw - cw) + " " + cur.unit }; }
-  if (cur.reps > prev.reps) return { dir: "up", text: "+" + (cur.reps - prev.reps) + " reps" };
-  if (cur.reps < prev.reps) return { dir: "down", text: "\u2212" + (prev.reps - cur.reps) + " reps" };
+  const cr = cur.repMax || cur.reps, pr = prev.repMax || prev.reps;
+  if (cr > pr) return { dir: "up", text: "+" + (cr - pr) + " reps" };
+  if (cr < pr) return { dir: "down", text: "\u2212" + (pr - cr) + " reps" };
   if (cur.sets > prev.sets) return { dir: "up", text: "+" + (cur.sets - prev.sets) + " sets" };
   if (cur.sets < prev.sets) return { dir: "down", text: "\u2212" + (prev.sets - cur.sets) + " sets" };
   return { dir: "same", text: "matched" };
 }
 function weightText(e) { return e.weight == null ? '<span class="weight">\u2014</span>' : '<span class="weight">' + e.weight + '</span> ' + e.unit; }
+function repText(o) { return (o.repMax && o.repMax > o.reps) ? (o.reps + "-" + o.repMax) : ("" + o.reps); }
+function parseRepsField(str) { const s = String(str).trim(); const m = s.split(/[-\u2013]/); const lo = parseInt(m[0], 10); if (!Number.isFinite(lo) || lo <= 0) return null; let hi = m.length > 1 ? parseInt(m[1], 10) : NaN; if (!Number.isFinite(hi) || hi <= lo) hi = null; return { reps: lo, repMax: hi }; }
+function parseRepsPair(low, high) { const lo = parseInt(low, 10); if (!Number.isFinite(lo) || lo <= 0) return null; let hi = parseInt(high, 10); if (!Number.isFinite(hi) || hi <= lo) hi = null; return { reps: lo, repMax: hi }; }
 
 function buildChart(points) {
   if (!points.length) return "";
@@ -524,13 +532,13 @@ function entryDisplayHTML(w, e) {
   return '<div class="entry"><div class="entry-top"><div class="entry-name">' + esc(e.name) + '</div><div class="entry-right">' + chip +
     '<button class="icon-btn" data-action="edit-ex" data-id="' + e.id + '" aria-label="Edit">' + SVG.pencil + '</button>' +
     '<button class="icon-btn danger" data-action="del-ex" data-id="' + e.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div>' +
-    '<div class="stats"><span>' + weightText(e) + '</span><span><span class="x">\u00d7</span> ' + e.reps + ' reps</span><span><span class="x">\u00d7</span> ' + e.sets + ' sets</span></div></div>';
+    '<div class="stats"><span>' + weightText(e) + '</span><span><span class="x">\u00d7</span> ' + repText(e) + ' reps</span><span><span class="x">\u00d7</span> ' + e.sets + ' sets</span></div></div>';
 }
 function entryEditHTML(w, e) {
   const seg = '<div class="seg" style="margin-top:8px;"><button type="button" class="' + (editUnit === "lb" ? "on" : "") + '" data-action="ed-unit" data-u="lb">lb</button><button type="button" class="' + (editUnit === "kg" ? "on" : "") + '" data-action="ed-unit" data-u="kg">kg</button></div>';
   return '<div class="entry editing"><input type="text" class="ed-name" value="' + esc(e.name) + '"><div class="row3">' +
     '<input type="text" class="num ed-weight" inputmode="decimal" value="' + (e.weight == null ? "" : e.weight) + '" placeholder="—">' +
-    '<input type="text" class="num ed-reps" inputmode="numeric" value="' + e.reps + '">' +
+    '<input type="text" class="num ed-reps" inputmode="numeric" value="' + esc(repText(e)) + '">' +
     '<input type="text" class="num ed-sets" inputmode="numeric" value="' + e.sets + '"></div>' + seg +
     '<div class="ed-actions"><button class="btn-mini save" data-action="save-ex" data-id="' + e.id + '">Save</button><button class="btn-mini cancel" data-action="cancel-ex">Cancel</button></div></div>';
 }
@@ -542,7 +550,8 @@ function workoutCardHTML(w) {
   const expanded = isExpanded(w), isToday = w.date === todayISO(), rel = relativeLabel(w.date);
   const pill = '<span class="wk-pill ' + (isToday ? "pill-today" : "pill-muted") + '">' + esc(rel) + '</span>';
   const title = w.type ? esc(w.type) : (isToday ? "Today\u2019s workout" : "Workout");
-  const meta = '<div class="wk-meta">' + SVG.calSm + '<span>' + w.date + '</span><span class="mdot">\u00b7</span>' + SVG.dbSm + '<span>' + w.entries.length + (w.entries.length === 1 ? " exercise" : " exercises") + '</span></div>';
+  const totalSets = w.entries.reduce((n, e) => n + (e.sets || 0), 0);
+  const meta = '<div class="wk-meta">' + SVG.calSm + '<span>' + w.date + '</span><span class="mdot">\u00b7</span>' + SVG.dbSm + '<span>' + w.entries.length + (w.entries.length === 1 ? " exercise" : " exercises") + '</span><span class="mdot">\u00b7</span><span>' + totalSets + (totalSets === 1 ? " set" : " sets") + '</span></div>';
   const main = '<div class="wk-main" data-action="toggle" data-wid="' + w.id + '"><div class="wk-tile">' + SVG.dumbbell + '</div><div class="wk-info"><div class="wk-titlerow"><span class="wk-title-text' + (w.type ? "" : " empty") + '">' + title + '</span>' + pill + '</div>' + meta + '</div><span class="wk-caret' + (expanded ? " open" : "") + '">' + SVG.caret + '</span></div>';
   let bodyHtml = "";
   if (expanded) {
@@ -566,7 +575,7 @@ function startPromptHTML() {
 
 /* ---- plan html ---- */
 function planExHTML(d, pe) {
-  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + pe.reps + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
+  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
   const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises planned yet.</div>';
@@ -661,19 +670,19 @@ function updateHint() {
   const prev = lastEntryFor(name, todayISO());
   if (!prev) { hint.innerHTML = "First time logging this \u2014 sets the baseline."; return; }
   const w = prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit;
-  hint.innerHTML = "Last time \u00b7 <b>" + esc(w) + " \u00d7 " + prev.reps + " \u00d7 " + prev.sets + "</b> on " + fmtShort(prev.date);
+  hint.innerHTML = "Last time \u00b7 <b>" + esc(w) + " \u00d7 " + repText(prev) + " \u00d7 " + prev.sets + "</b> on " + fmtShort(prev.date);
 }
 
 /* ---- log actions ---- */
 function addEntry(ev) {
   ev.preventDefault();
   const name = $("ex-name").value.trim(), wRaw = $("ex-weight").value.trim();
-  const reps = parseInt($("ex-reps").value, 10), sets = parseInt($("ex-sets").value, 10);
+  const rr = parseRepsField($("ex-reps").value), sets = parseInt($("ex-sets").value, 10);
   if (!name) return;
-  if (!Number.isFinite(reps) || reps <= 0 || !Number.isFinite(sets) || sets <= 0) { $("hint").innerHTML = '<span style="color:var(--down)">Reps and sets need to be whole numbers.</span>'; return; }
+  if (!rr || !Number.isFinite(sets) || sets <= 0) { $("hint").innerHTML = '<span style="color:var(--down)">Enter reps (e.g. 8 or 8-10) and whole-number sets.</span>'; return; }
   let weight = null;
   if (wRaw !== "") { weight = parseFloat(wRaw); if (!Number.isFinite(weight) || weight < 0) { $("hint").innerHTML = '<span style="color:var(--down)">Weight should be a number (or blank).</span>'; return; } }
-  ensureTodayWorkout().entries.push({ id: uid(), name, weight, reps, sets, unit: exUnit, ts: Date.now() });
+  ensureTodayWorkout().entries.push({ id: uid(), name, weight, reps: rr.reps, repMax: rr.repMax, sets, unit: exUnit, ts: Date.now() });
   save();
   $("ex-name").value = ""; $("ex-weight").value = ""; $("ex-reps").value = ""; $("ex-sets").value = ""; $("hint").innerHTML = "";
   renderAll(); $("ex-name").focus();
@@ -684,7 +693,7 @@ function startFromPlan(did) {
   const w = ensureTodayWorkout();
   if (w.entries.length && !confirm('Add the "' + d.name + '" exercises to today\u2019s workout?')) return;
   w.type = d.name;
-  d.exercises.forEach((pe, i) => w.entries.push({ id: uid(), name: pe.name, weight: null, reps: pe.reps, sets: pe.sets, unit: exUnit, ts: Date.now() + i }));
+  d.exercises.forEach((pe, i) => w.entries.push({ id: uid(), name: pe.name, weight: null, reps: pe.reps, repMax: pe.repMax || null, sets: pe.sets, unit: exUnit, ts: Date.now() + i }));
   openChooserId = null; save(); renderAll();
 }
 function setType(wid, type) { const w = findWorkout(wid); if (!w) return; w.type = (type || "").trim(); openChooserId = null; save(); renderAll(); }
@@ -694,12 +703,12 @@ function beginEdit(id) { const c = findEntryCtx(id); if (!c) return; editingId =
 function saveEdit(id) {
   const c = findEntryCtx(id); if (!c) return;
   const name = valOf(".ed-name"), wRaw = valOf(".ed-weight");
-  const reps = parseInt((document.querySelector(".ed-reps") || {}).value, 10), sets = parseInt((document.querySelector(".ed-sets") || {}).value, 10);
+  const rr = parseRepsField((document.querySelector(".ed-reps") || {}).value), sets = parseInt((document.querySelector(".ed-sets") || {}).value, 10);
   if (!name) { alert("Give the exercise a name."); return; }
-  if (!Number.isFinite(reps) || reps <= 0 || !Number.isFinite(sets) || sets <= 0) { alert("Reps and sets need to be whole numbers."); return; }
+  if (!rr || !Number.isFinite(sets) || sets <= 0) { alert("Enter reps (e.g. 8 or 8-10) and whole-number sets."); return; }
   let weight = null;
   if (wRaw !== "") { weight = parseFloat(wRaw); if (!Number.isFinite(weight) || weight < 0) { alert("Weight should be a number, or blank."); return; } }
-  Object.assign(c.e, { name, weight, reps, sets, unit: editUnit });
+  Object.assign(c.e, { name, weight, reps: rr.reps, repMax: rr.repMax, sets, unit: editUnit });
   editingId = null; save(); renderAll();
 }
 function delEntry(id) {
@@ -804,9 +813,9 @@ function pickerAdd() {
   const d = plan.days.find(x => x.id === pickerDay); if (!d) return;
   const name = composeName();
   if (!name) { const el = document.querySelector(".picker-custom-name"); if (el) el.focus(); return; }
-  const sets = parseInt(pickerSetsStr, 10), reps = parseInt(pickerRepsStr, 10);
-  if (!Number.isFinite(sets) || sets <= 0 || !Number.isFinite(reps) || reps <= 0) { alert("Sets and reps should be whole numbers."); return; }
-  d.exercises.push({ id: uid(), name, sets, reps });
+  const sets = parseInt(pickerSetsStr, 10), rr = parseRepsPair(pickerRepLowStr, pickerRepHighStr);
+  if (!Number.isFinite(sets) || sets <= 0 || !rr) { alert("Enter whole-number sets and reps."); return; }
+  d.exercises.push({ id: uid(), name, sets, reps: rr.reps, repMax: rr.repMax });
   savePlan(); pickerMovement = null; renderPlan(); renderPicker();
 }
 function renderPicker() {
@@ -835,7 +844,7 @@ function renderPicker() {
     const title = isCustom ? "Custom exercise" : esc(pickerMovement.m);
     inner = '<div class="pick-head"><button class="icon-btn" data-action="picker-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">' + title + '</div><button class="icon-btn" data-action="picker-close" aria-label="Close">' + SVG.close + '</button></div>' +
       controls +
-      '<div class="pick-sub">Sets &amp; reps</div><div class="pick-sr"><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"><span class="pick-x">sets \u00d7</span><input type="text" class="num picker-reps" inputmode="numeric" value="' + esc(pickerRepsStr) + '"><span class="pick-x">reps</span></div>' +
+      '<div class="pick-sub">Sets &amp; reps</div><div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num picker-rep-low" inputmode="numeric" value="' + esc(pickerRepLowStr) + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num picker-rep-high" inputmode="numeric" value="' + esc(pickerRepHighStr) + '" placeholder="\u2014"></div></div>' +
       preview +
       '<button class="btn-primary" data-action="picker-add">Add to ' + esc(d.name) + '</button>';
   }
@@ -847,8 +856,8 @@ function onPickerClick(e) {
   const a = btn.dataset.action;
   if (a === "picker-close") { pickerDay = null; renderPicker(); }
   else if (a === "picker-cat") { pickerCat = btn.dataset.cat; renderPicker(); }
-  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepsStr = "8"; renderPicker(); }
-  else if (a === "picker-custom") { pickerMovement = { custom: true }; pickerEquip = null; pickerVar = null; pickerCustomName = ""; pickerSetsStr = "3"; pickerRepsStr = "8"; renderPicker(); }
+  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; renderPicker(); }
+  else if (a === "picker-custom") { pickerMovement = { custom: true }; pickerEquip = null; pickerVar = null; pickerCustomName = ""; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; renderPicker(); }
   else if (a === "picker-back") { pickerMovement = null; renderPicker(); }
   else if (a === "picker-equip") { pickerEquip = btn.dataset.v; renderPicker(); }
   else if (a === "picker-var") { pickerVar = (pickerVar === btn.dataset.v ? null : btn.dataset.v); renderPicker(); }
@@ -857,7 +866,8 @@ function onPickerClick(e) {
 function onPickerInput(e) {
   const t = e.target;
   if (t.classList.contains("picker-sets")) pickerSetsStr = t.value;
-  else if (t.classList.contains("picker-reps")) pickerRepsStr = t.value;
+  else if (t.classList.contains("picker-rep-low")) pickerRepLowStr = t.value;
+  else if (t.classList.contains("picker-rep-high")) pickerRepHighStr = t.value;
   else if (t.classList.contains("picker-custom-name")) pickerCustomName = t.value;
 }
 
