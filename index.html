@@ -369,7 +369,7 @@
   <div id="editor"></div>
   <div id="cardio"></div>
   <div id="logflow"></div>
-  <div id="version">v18</div>
+  <div id="version">v19</div>
 
 <script>
 "use strict";
@@ -422,7 +422,8 @@ const CATALOG = {
     { m: "Leg Raise", eq: ["Bodyweight"], va: ["Hanging", "Lying"] },
     { m: "Russian Twist", eq: ["Bodyweight", "Weighted"], va: [] },
     { m: "Cable Woodchop", eq: ["Cable"], va: [] }
-  ]
+  ],
+  Cardio: CARDIO_ACTS.map(function (m) { return { m: m, cardio: true }; })
 };
 function dayCategory(name) {
   const n = (name || "").toLowerCase();
@@ -430,11 +431,12 @@ function dayCategory(name) {
   if (/pull|back|bicep/.test(n)) return "Pull";
   if (/leg|lower|quad|glute|calf|hamstring/.test(n)) return "Legs";
   if (/core|abs?\b/.test(n)) return "Core";
+  if (/cardio|run|bike|cycl|swim|elliptical|stair|hik|rowing/.test(n)) return "Cardio";
   return "All";
 }
 function pickerMovementsFor(cat) {
   const out = [];
-  const cats = cat === "All" ? ["Push", "Pull", "Legs", "Core"] : [cat];
+  const cats = cat === "All" ? ["Push", "Pull", "Legs", "Core", "Cardio"] : [cat];
   cats.forEach(c => (CATALOG[c] || []).forEach((it, idx) => out.push({ m: it.m, cat: c, idx })));
   return out;
 }
@@ -494,6 +496,7 @@ if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 let activeTab = "log";
 let editingId = null, editUnit = "lb", openChooserId = null, exUnit = "lb", chartSel = "__bw__";
 let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepLowStr = "8", pickerRepHighStr = "", pickerCustomName = "";
+let pickerCMinStr = "30", pickerCDistStr = "", pickerCUnit = "mi";
 let editorWid = null;
 let editPlanId = null;
 let pickerFail = false, peEditFail = false, addFail = false;
@@ -660,6 +663,10 @@ function startPromptHTML() {
 
 /* ---- plan html ---- */
 function planExHTML(d, pe) {
+  if (pe.kind === "cardio") {
+    const sch = (pe.minutes || 0) + " min" + (pe.distance ? " \u00b7 " + pe.distance + " " + (pe.distUnit || "mi") : "");
+    return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span>' + exTitleHTML(pe) + '<span class="plan-ex-scheme">' + sch + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
+  }
   if (editPlanId === pe.id) {
     const srBlock = peEditFail ? '<div class="pick-failrow"><div class="pick-failsets"><div class="pick-lbl">Sets</div><input type="text" class="num pe-ed-sets" inputmode="numeric" value="' + pe.sets + '"></div><div class="pick-failnote">\u00d7 reps to failure</div></div>' : '<div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num pe-ed-sets" inputmode="numeric" value="' + pe.sets + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num pe-ed-replow" inputmode="numeric" value="' + pe.reps + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num pe-ed-rephigh" inputmode="numeric" value="' + (pe.repMax || "") + '" placeholder="\u2014"></div></div>';
     return '<div class="plan-ex-edit"><input type="text" class="pe-ed-name" value="' + esc(pe.name) + '"><div class="pick-subrow"><span class="pick-sub">Sets &amp; reps</span><button type="button" class="failtoggle' + (peEditFail ? " on" : "") + '" data-action="pe-editfail">To failure</button></div>' + srBlock + '<div class="ed-actions"><button class="btn-mini save" data-action="pe-editsave" data-did="' + d.id + '" data-eid="' + pe.id + '">Save</button><button class="btn-mini cancel" data-action="pe-editcancel">Cancel</button></div></div>';
@@ -669,10 +676,13 @@ function planExHTML(d, pe) {
 function planDayHTML(d) {
   const collapsed = planCollapsed.has(d.id);
   const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises yet.</div>';
-  let rLow = 0, rHigh = 0, tSets = 0;
-  d.exercises.forEach(pe => { tSets += (pe.sets || 0); if (pe.toFailure) return; const hi = pe.repMax || pe.reps; rLow += (pe.sets || 0) * pe.reps; rHigh += (pe.sets || 0) * hi; });
+  let rLow = 0, rHigh = 0, tSets = 0, cMin = 0;
+  d.exercises.forEach(pe => { if (pe.kind === "cardio") { cMin += (pe.minutes || 0); return; } tSets += (pe.sets || 0); if (pe.toFailure) return; const hi = pe.repMax || pe.reps; rLow += (pe.sets || 0) * pe.reps; rHigh += (pe.sets || 0) * hi; });
   const repsStr = rHigh > rLow ? (rLow + "-" + rHigh) : ("" + rLow);
-  const volumeStr = tSets + " sets" + (rHigh > 0 ? " \u00b7 " + repsStr + " reps" : "");
+  const vParts = [];
+  if (d.exercises.some(pe => pe.kind !== "cardio")) { let s = tSets + " sets"; if (rHigh > 0) s += " \u00b7 " + repsStr + " reps"; vParts.push(s); }
+  if (cMin > 0) vParts.push(cMin + " min");
+  const volumeStr = vParts.join(" \u00b7 ");
   const caret = '<button class="icon-btn pd-caret' + (collapsed ? "" : " open") + '" data-action="pd-toggle" data-did="' + d.id + '" aria-label="Expand or collapse">' + SVG.caret + '</button>';
   const head = '<div class="plan-day-head">' + caret + '<input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete workout">' + SVG.trash + '</button></div>';
   if (collapsed) {
@@ -924,14 +934,21 @@ function pickerAdd() {
   const d = plan.days.find(x => x.id === pickerDay); if (!d) return;
   const name = composeName();
   if (!name) { const el = document.querySelector(".picker-custom-name"); if (el) el.focus(); return; }
-  const sets = parseInt(pickerSetsStr, 10);
-  if (!Number.isFinite(sets) || sets <= 0) { alert("Enter a whole number of sets."); return; }
-  let base, mods = [];
-  if (pickerMovement && !pickerMovement.custom) { base = pickerMovement.m; if (pickerVar) mods.push(pickerVar); if (pickerEquip && pickerEquip !== "Bodyweight") mods.push(pickerEquip); }
-  else base = name;
   let ex;
-  if (pickerFail) ex = { id: uid(), name: name, base: base, mods: mods, sets: sets, reps: 0, repMax: null, toFailure: true };
-  else { const rr = parseRepsPair(pickerRepLowStr, pickerRepHighStr); if (!rr) { alert("Enter whole-number reps."); return; } ex = { id: uid(), name: name, base: base, mods: mods, sets: sets, reps: rr.reps, repMax: rr.repMax, toFailure: false }; }
+  if (pickerMovement && pickerMovement.cardio) {
+    const min = parseInt(pickerCMinStr, 10);
+    if (!Number.isFinite(min) || min <= 0) { alert("Enter target minutes."); return; }
+    const dist = pickerCDistStr.trim() === "" ? null : (parseFloat(pickerCDistStr) > 0 ? parseFloat(pickerCDistStr) : null);
+    ex = { id: uid(), kind: "cardio", name: name, minutes: min, distance: dist, distUnit: pickerCUnit };
+  } else {
+    const sets = parseInt(pickerSetsStr, 10);
+    if (!Number.isFinite(sets) || sets <= 0) { alert("Enter a whole number of sets."); return; }
+    let base, mods = [];
+    if (pickerMovement && !pickerMovement.custom) { base = pickerMovement.m; if (pickerVar) mods.push(pickerVar); if (pickerEquip && pickerEquip !== "Bodyweight") mods.push(pickerEquip); }
+    else base = name;
+    if (pickerFail) ex = { id: uid(), name: name, base: base, mods: mods, sets: sets, reps: 0, repMax: null, toFailure: true };
+    else { const rr = parseRepsPair(pickerRepLowStr, pickerRepHighStr); if (!rr) { alert("Enter whole-number reps."); return; } ex = { id: uid(), name: name, base: base, mods: mods, sets: sets, reps: rr.reps, repMax: rr.repMax, toFailure: false }; }
+  }
   d.exercises.push(ex);
   savePlan(); pickerMovement = null; renderPlan(); renderPicker();
 }
@@ -942,7 +959,7 @@ function renderPicker() {
   box.style.display = "flex";
   let inner = "";
   if (!pickerMovement) {
-    const cats = ["Push", "Pull", "Legs", "Core", "All"];
+    const cats = ["Push", "Pull", "Legs", "Core", "Cardio", "All"];
     const catChips = cats.map(c => '<button class="chip-btn' + (pickerCat === c ? " on" : "") + '" data-action="picker-cat" data-cat="' + c + '">' + c + '</button>').join("");
     const list = pickerMovementsFor(pickerCat).map(it => '<button class="pick-item" data-action="picker-move" data-cat="' + it.cat + '" data-idx="' + it.idx + '"><span>' + esc(it.m) + '</span>' + SVG.caretR + '</button>').join("");
     inner = '<div class="pick-head"><span style="width:34px"></span><div class="pick-title">Add to ' + esc(d.name) + '</div><button class="icon-btn" data-action="picker-close" aria-label="Close">' + SVG.close + '</button></div>' +
@@ -950,19 +967,25 @@ function renderPicker() {
       '<div class="pick-list">' + list + '<button class="pick-item custom" data-action="picker-custom"><span>Custom exercise\u2026</span>' + SVG.caretR + '</button></div>';
   } else {
     const isCustom = !!pickerMovement.custom;
+    const isCardio = !!pickerMovement.cardio;
     let controls = "";
     if (isCustom) {
       controls += '<input type="text" class="picker-custom-name" placeholder="Exercise name" value="' + esc(pickerCustomName) + '" style="margin-bottom:14px;">';
-    } else {
+    } else if (!isCardio) {
       if (pickerMovement.eq && pickerMovement.eq.length) controls += '<div class="pick-sub">Equipment</div><div class="chips" style="margin-bottom:14px;">' + pickerMovement.eq.map(x => '<button class="chip-btn' + (pickerEquip === x ? " on" : "") + '" data-action="picker-equip" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div>';
       if (pickerMovement.va && pickerMovement.va.length) controls += '<div class="pick-sub">Variation <span style="text-transform:none;font-weight:400;color:var(--dim)">(optional)</span></div><div class="chips" style="margin-bottom:14px;">' + pickerMovement.va.map(x => '<button class="chip-btn' + (pickerVar === x ? " on" : "") + '" data-action="picker-var" data-v="' + esc(x) + '">' + esc(x) + '</button>').join("") + '</div>';
+    }
+    let srSection;
+    if (isCardio) {
+      const units = ["mi", "km", "m"].map(u => '<button type="button" class="' + (pickerCUnit === u ? "on" : "") + '" data-action="picker-cunit" data-u="' + u + '">' + u + '</button>').join("");
+      srSection = '<div class="pick-sub">Target</div><div class="pick-srgrid"><div><div class="pick-lbl">Minutes</div><input type="text" class="num picker-cmin" inputmode="numeric" value="' + esc(pickerCMinStr) + '"></div><div><div class="pick-lbl">Distance <span class="opt">(opt)</span></div><input type="text" class="num picker-cdist" inputmode="decimal" value="' + esc(pickerCDistStr) + '" placeholder="\u2014"></div><div><div class="pick-lbl">Unit</div><div class="seg" style="width:100%">' + units + '</div></div></div>';
+    } else {
+      srSection = '<div class="pick-subrow"><span class="pick-sub">Sets &amp; reps</span><button type="button" class="failtoggle' + (pickerFail ? " on" : "") + '" data-action="picker-fail">To failure</button></div>' + (pickerFail ? '<div class="pick-failrow"><div class="pick-failsets"><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div class="pick-failnote">\u00d7 reps to failure</div></div>' : '<div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num picker-rep-low" inputmode="numeric" value="' + esc(pickerRepLowStr) + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num picker-rep-high" inputmode="numeric" value="' + esc(pickerRepHighStr) + '" placeholder="\u2014"></div></div>');
     }
     const preview = isCustom ? "" : '<div class="pick-preview">Adds: <b>' + esc(composeName()) + '</b></div>';
     const title = isCustom ? "Custom exercise" : esc(pickerMovement.m);
     inner = '<div class="pick-head"><button class="icon-btn" data-action="picker-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">' + title + '</div><button class="icon-btn" data-action="picker-close" aria-label="Close">' + SVG.close + '</button></div>' +
-      controls +
-      '<div class="pick-subrow"><span class="pick-sub">Sets &amp; reps</span><button type="button" class="failtoggle' + (pickerFail ? " on" : "") + '" data-action="picker-fail">To failure</button></div>' + (pickerFail ? '<div class="pick-failrow"><div class="pick-failsets"><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div class="pick-failnote">\u00d7 reps to failure</div></div>' : '<div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num picker-rep-low" inputmode="numeric" value="' + esc(pickerRepLowStr) + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num picker-rep-high" inputmode="numeric" value="' + esc(pickerRepHighStr) + '" placeholder="\u2014"></div></div>') +
-      preview +
+      controls + srSection + preview +
       '<button class="btn-primary" data-action="picker-add">Add to ' + esc(d.name) + '</button>';
   }
   box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
@@ -973,9 +996,10 @@ function onPickerClick(e) {
   const a = btn.dataset.action;
   if (a === "picker-close") { pickerDay = null; renderPicker(); }
   else if (a === "picker-cat") { pickerCat = btn.dataset.cat; renderPicker(); }
-  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; pickerFail = false; renderPicker(); }
+  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; pickerFail = false; pickerCMinStr = "30"; pickerCDistStr = ""; pickerCUnit = "mi"; renderPicker(); }
   else if (a === "picker-custom") { pickerMovement = { custom: true }; pickerEquip = null; pickerVar = null; pickerCustomName = ""; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; pickerFail = false; renderPicker(); }
   else if (a === "picker-fail") { pickerFail = !pickerFail; renderPicker(); }
+  else if (a === "picker-cunit") { pickerCUnit = btn.dataset.u; renderPicker(); }
   else if (a === "picker-back") { pickerMovement = null; renderPicker(); }
   else if (a === "picker-equip") { pickerEquip = btn.dataset.v; renderPicker(); }
   else if (a === "picker-var") { pickerVar = (pickerVar === btn.dataset.v ? null : btn.dataset.v); renderPicker(); }
@@ -986,6 +1010,8 @@ function onPickerInput(e) {
   if (t.classList.contains("picker-sets")) pickerSetsStr = t.value;
   else if (t.classList.contains("picker-rep-low")) pickerRepLowStr = t.value;
   else if (t.classList.contains("picker-rep-high")) pickerRepHighStr = t.value;
+  else if (t.classList.contains("picker-cmin")) pickerCMinStr = t.value;
+  else if (t.classList.contains("picker-cdist")) pickerCDistStr = t.value;
   else if (t.classList.contains("picker-custom-name")) pickerCustomName = t.value;
 }
 
