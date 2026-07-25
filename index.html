@@ -354,7 +354,7 @@
   <div id="picker"></div>
   <div id="editor"></div>
   <div id="cardio"></div>
-  <div id="version">v15</div>
+  <div id="version">v16</div>
 
 <script>
 "use strict";
@@ -389,14 +389,17 @@ const CATALOG = {
   ],
   Legs: [
     { m: "Squat", eq: ["Barbell", "Dumbbell", "Smith machine", "Machine"], va: ["Back", "Front", "Goblet"] },
-    { m: "Leg Press", eq: ["Machine"], va: [] },
+    { m: "Leg Press", eq: ["Machine"], va: ["Single-leg"] },
     { m: "Lunge", eq: ["Dumbbell", "Barbell", "Bodyweight"], va: ["Walking", "Reverse"] },
     { m: "Bulgarian Split Squat", eq: ["Dumbbell", "Barbell", "Smith machine", "Bodyweight"], va: [] },
-    { m: "Romanian Deadlift", eq: ["Barbell", "Dumbbell"], va: [] },
-    { m: "Leg Curl", eq: ["Machine"], va: ["Seated", "Lying"] },
-    { m: "Leg Extension", eq: ["Machine"], va: [] },
-    { m: "Hip Thrust", eq: ["Barbell", "Machine"], va: [] },
-    { m: "Calf Raise", eq: ["Machine", "Dumbbell", "Smith machine"], va: ["Standing", "Seated"] }
+    { m: "Pistol Squat", eq: ["Bodyweight", "Weighted"], va: [] },
+    { m: "Step-up", eq: ["Dumbbell", "Barbell", "Bodyweight"], va: [] },
+    { m: "Romanian Deadlift", eq: ["Barbell", "Dumbbell"], va: ["Single-leg"] },
+    { m: "Leg Curl", eq: ["Machine"], va: ["Seated", "Lying", "Single-leg"] },
+    { m: "Leg Extension", eq: ["Machine"], va: ["Single-leg"] },
+    { m: "Hip Thrust", eq: ["Barbell", "Machine"], va: ["Single-leg"] },
+    { m: "Single-Leg Glute Bridge", eq: ["Bodyweight", "Weighted"], va: [] },
+    { m: "Calf Raise", eq: ["Machine", "Dumbbell", "Smith machine"], va: ["Standing", "Seated", "Single-leg"] }
   ],
   Core: [
     { m: "Plank", eq: ["Bodyweight", "Weighted"], va: [] },
