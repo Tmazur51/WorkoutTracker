@@ -6,9 +6,9 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
-<meta name="apple-mobile-web-app-title" content="IronLog">
+<meta name="apple-mobile-web-app-title" content="Onward">
 <meta name="theme-color" content="#FAFAF7">
-<title>IronLog</title>
+<title>Onward</title>
 <style>
   :root {
     --bg: #FAFAF7; --surface: #FFFFFF; --surface-2: #F3F3EF; --line: #ECECE7; --line-2: #E2E2DC;
@@ -209,6 +209,13 @@
   .pick-preview { font-size: 13px; color: var(--muted); margin-bottom: 12px; }
   .pick-preview b { color: var(--text); font-weight: 600; }
 
+  /* drag to reorder */
+  .plan-ex-list { display: flex; flex-direction: column; }
+  .drag-handle { color: var(--dim); cursor: grab; touch-action: none; display: inline-flex; align-items: center; flex-shrink: 0; margin-right: -2px; }
+  .drag-handle:active { cursor: grabbing; }
+  .plan-ex { touch-action: pan-y; }
+  .plan-ex.dragging { opacity: 0.9; background: #fff; box-shadow: 0 6px 18px rgba(0,0,0,0.14); }
+
   @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 </head>
@@ -216,7 +223,7 @@
   <div class="wrap">
     <header class="app-header">
       <div class="brand-tile"><svg class="ic ic-lg" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg></div>
-      <div><div class="brand-title">IronLog</div><div class="brand-sub" id="brand-sub">Track your training and progress</div></div>
+      <div><div class="brand-title">Onward</div><div class="brand-sub" id="brand-sub">Track your training and progress</div></div>
     </header>
 
     <div id="banner"><strong>Preview mode.</strong> Storage is blocked here, so nothing is remembered between reloads. On your phone everything saves automatically.</div>
@@ -397,7 +404,8 @@ const SVG = {
   trash: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M9.5 7V4.5h5V7"/><path d="M6.5 7l1 12.5h9l1-12.5"/></svg>',
   caretR: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
   caretL: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
-  close: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>'
+  close: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>',
+  grip: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -558,11 +566,12 @@ function startPromptHTML() {
 
 /* ---- plan html ---- */
 function planExHTML(d, pe) {
-  return '<div class="plan-ex"><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + pe.reps + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
+  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + pe.reps + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
   const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises planned yet.</div>';
-  return '<div class="wk-card"><div class="plan-day-head"><input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete day">' + SVG.trash + '</button></div>' + rows +
+  return '<div class="wk-card"><div class="plan-day-head"><input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete day">' + SVG.trash + '</button></div>' +
+    '<div class="plan-ex-list" data-did="' + d.id + '">' + rows + '</div>' +
     '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
 }
 function renderPlan() {
@@ -737,10 +746,10 @@ function saveHeight() {
   saveBody(); renderBody();
 }
 function exportData() {
-  const payload = { app: "ironlog", version: 4, workouts, body, plan };
+  const payload = { app: "onward", version: 4, workouts, body, plan };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob); const a = document.createElement("a");
-  a.href = url; a.download = "ironlog-backup-" + todayISO() + ".json"; a.click(); URL.revokeObjectURL(url);
+  a.href = url; a.download = "onward-backup-" + todayISO() + ".json"; a.click(); URL.revokeObjectURL(url);
 }
 function importData(file) {
   const reader = new FileReader();
@@ -758,7 +767,7 @@ function importData(file) {
       if (data && data.plan && Array.isArray(data.plan.days)) plan = data.plan;
       const tw = todayWorkout(); if (tw) expandedSet.add(tw.id);
       save(); saveBody(); savePlan(); renderAll();
-    } catch (err) { alert("That file couldn't be read as an IronLog backup."); }
+    } catch (err) { alert("That file couldn't be read as an Onward backup."); }
   };
   reader.readAsText(file);
 }
@@ -852,6 +861,43 @@ function onPickerInput(e) {
   else if (t.classList.contains("picker-custom-name")) pickerCustomName = t.value;
 }
 
+/* ---- drag to reorder planned exercises (works with touch + mouse) ---- */
+let dragState = null;
+function onPointerDown(e) {
+  const handle = e.target.closest("[data-handle]"); if (!handle) return;
+  const row = handle.closest(".plan-ex"); if (!row) return;
+  const list = row.closest(".plan-ex-list"); if (!list) return;
+  e.preventDefault();
+  dragState = { row: row, list: list, handle: handle, pointerId: e.pointerId };
+  row.classList.add("dragging");
+  try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+  handle.addEventListener("pointermove", onPointerMove);
+  handle.addEventListener("pointerup", onPointerUp);
+  handle.addEventListener("pointercancel", onPointerUp);
+}
+function onPointerMove(e) {
+  if (!dragState) return;
+  e.preventDefault();
+  const row = dragState.row, list = dragState.list, y = e.clientY;
+  const sibs = [].slice.call(list.querySelectorAll(".plan-ex")).filter(el => el !== row);
+  let placed = false;
+  for (const sib of sibs) { const r = sib.getBoundingClientRect(); if (y < r.top + r.height / 2) { list.insertBefore(row, sib); placed = true; break; } }
+  if (!placed) list.appendChild(row);
+}
+function onPointerUp() {
+  if (!dragState) return;
+  const row = dragState.row, list = dragState.list, handle = dragState.handle, pid = dragState.pointerId;
+  row.classList.remove("dragging");
+  try { handle.releasePointerCapture(pid); } catch (err) {}
+  handle.removeEventListener("pointermove", onPointerMove);
+  handle.removeEventListener("pointerup", onPointerUp);
+  handle.removeEventListener("pointercancel", onPointerUp);
+  const d = plan.days.find(x => x.id === list.dataset.did);
+  if (d) { const order = [].slice.call(list.querySelectorAll(".plan-ex")).map(el => el.dataset.eid); d.exercises.sort((a, b) => order.indexOf(a.id) - order.indexOf(b.id)); savePlan(); }
+  dragState = null;
+  renderPlan();
+}
+
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
 $("ex-name").addEventListener("input", updateHint);
@@ -862,6 +908,7 @@ $("plan-content").addEventListener("click", onCardAction);
 $("plan-content").addEventListener("change", onPlanChange);
 $("picker").addEventListener("click", onPickerClick);
 $("picker").addEventListener("input", onPickerInput);
+$("plan-content").addEventListener("pointerdown", onPointerDown);
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
