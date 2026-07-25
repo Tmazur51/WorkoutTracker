@@ -199,7 +199,7 @@
   #version { position: fixed; left: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); font-size: 10px; font-weight: 600; color: var(--dim); background: rgba(255,255,255,0.72); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; z-index: 40; pointer-events: none; font-variant-numeric: tabular-nums; }
 
   /* exercise picker */
-  #picker, #editor, #cardio, #logflow { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  #picker, #editor, #cardio, #logflow, #foodsheet { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
   .pick-panel { background: var(--surface); width: 100%; max-width: 540px; border-radius: 20px 20px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
   .pick-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
   .pick-title { flex: 1; font-size: 17px; font-weight: 700; color: var(--text); text-align: center; }
@@ -234,6 +234,26 @@
   .cardio-stats b { color: var(--text); font-weight: 700; }
   .cardio-stats .ic { color: var(--orange); }
   .chip.cardio-chip { color: var(--blue); background: var(--blue-bg); }
+  .food-totals { text-align: center; }
+  .food-cal-big { font-size: 40px; font-weight: 800; color: var(--text); letter-spacing: -0.02em; line-height: 1; }
+  .food-cal-sub { font-size: 12.5px; color: var(--muted); margin-top: 4px; }
+  .fbar { height: 8px; background: var(--surface-2); border-radius: 999px; margin: 12px 0 2px; overflow: hidden; }
+  .fbar.sm { height: 6px; margin: 6px 0 0; }
+  .fbar-fill { height: 100%; background: var(--ink); border-radius: 999px; }
+  .fbar-fill.good { background: var(--green); }
+  .fbar-fill.over { background: var(--down); }
+  .food-macros { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px; margin-top: 18px; text-align: left; }
+  .fm-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; }
+  .fm-val { font-size: 17px; font-weight: 700; color: var(--text); margin-top: 3px; font-variant-numeric: tabular-nums; }
+  .fm-ref { font-size: 12px; font-weight: 500; color: var(--muted); }
+  .food-goalrow { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--line); }
+  .food-goalrow input.num { max-width: 120px; min-height: 44px; }
+  .food-item-name { display: flex; flex-direction: column; gap: 2px; text-align: left; min-width: 0; }
+  .food-item-serv { font-size: 12px; font-weight: 400; color: var(--muted); }
+  .food-item-cal { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; flex-shrink: 0; }
+  .food-detail-serv { font-size: 13px; color: var(--muted); }
+  .food-preview { font-size: 14px; color: var(--muted); margin: 16px 0; font-variant-numeric: tabular-nums; }
+  .food-preview b { color: var(--text); font-weight: 700; }
   .pd-caret { transition: transform 0.15s ease; }
   .pd-caret.open { transform: rotate(180deg); }
   .plan-collapsed-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -348,6 +368,11 @@
       </div>
     </section>
 
+    <section class="page" id="page-food">
+      <p class="eyebrow">Food</p>
+      <div id="food-content"></div>
+    </section>
+
     <footer>
       <div class="footnote">Data lives <b id="storage-note">on this device</b>.</div>
       <div class="foot-actions">
@@ -363,13 +388,15 @@
     <button class="tab" data-tab="plan"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 11h6"/><path d="M9 15h4"/></svg><span>Edit</span></button>
     <button class="tab" data-tab="progress"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11"/><path d="M12 20V4"/><path d="M19 20v-6"/></svg><span>Progress</span></button>
     <button class="tab" data-tab="body"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg><span>Body</span></button>
+    <button class="tab" data-tab="food"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v18"/><path d="M6 3v5a2 2 0 004 0V3"/><path d="M16 21V3c-2 0-3 2-3 5s1 4 3 4"/></svg><span>Food</span></button>
   </div></nav>
 
   <div id="picker"></div>
   <div id="editor"></div>
   <div id="cardio"></div>
   <div id="logflow"></div>
-  <div id="version">v19</div>
+  <div id="foodsheet"></div>
+  <div id="version">v21</div>
 
 <script>
 "use strict";
@@ -425,6 +452,81 @@ const CATALOG = {
   ],
   Cardio: CARDIO_ACTS.map(function (m) { return { m: m, cardio: true }; })
 };
+const FOOD_CATS = ["Protein", "Dairy", "Grains", "Fruit", "Veg", "Fats & nuts", "Snacks", "Drinks"];
+const FOODS = {
+  Protein: [
+    { n: "Chicken breast", s: "1 breast (170g)", cal: 280, p: 53, c: 0, f: 6 },
+    { n: "Chicken thigh", s: "1 thigh (90g)", cal: 180, p: 22, c: 0, f: 10 },
+    { n: "Ground beef (85%)", s: "4 oz cooked", cal: 250, p: 22, c: 0, f: 17 },
+    { n: "Ground turkey (93%)", s: "4 oz cooked", cal: 170, p: 22, c: 0, f: 9 },
+    { n: "Salmon", s: "4 oz cooked", cal: 233, p: 25, c: 0, f: 14 },
+    { n: "Tuna (canned)", s: "1 can (5 oz)", cal: 120, p: 27, c: 0, f: 1 },
+    { n: "Shrimp", s: "4 oz cooked", cal: 120, p: 23, c: 1, f: 2 },
+    { n: "Sirloin steak", s: "4 oz cooked", cal: 210, p: 26, c: 0, f: 11 },
+    { n: "Pork chop", s: "4 oz cooked", cal: 230, p: 26, c: 0, f: 13 },
+    { n: "Bacon", s: "2 slices", cal: 90, p: 6, c: 0, f: 7 },
+    { n: "Tofu (firm)", s: "1/2 block (150g)", cal: 120, p: 13, c: 3, f: 7 },
+    { n: "Egg", s: "1 large", cal: 72, p: 6, c: 0, f: 5 },
+    { n: "Egg whites", s: "1 cup", cal: 120, p: 26, c: 2, f: 0 }
+  ],
+  Dairy: [
+    { n: "Greek yogurt (nonfat)", s: "1 cup (170g)", cal: 100, p: 17, c: 6, f: 0 },
+    { n: "Milk (2%)", s: "1 cup", cal: 120, p: 8, c: 12, f: 5 },
+    { n: "Cottage cheese", s: "1/2 cup", cal: 90, p: 12, c: 5, f: 2 },
+    { n: "Cheddar cheese", s: "1 oz", cal: 110, p: 7, c: 1, f: 9 },
+    { n: "Whey protein", s: "1 scoop", cal: 120, p: 24, c: 3, f: 1 },
+    { n: "String cheese", s: "1 stick", cal: 80, p: 7, c: 1, f: 6 }
+  ],
+  Grains: [
+    { n: "White rice", s: "1 cup cooked", cal: 205, p: 4, c: 45, f: 0 },
+    { n: "Brown rice", s: "1 cup cooked", cal: 215, p: 5, c: 45, f: 2 },
+    { n: "Oats (dry)", s: "1/2 cup", cal: 150, p: 5, c: 27, f: 3 },
+    { n: "Pasta", s: "1 cup cooked", cal: 220, p: 8, c: 43, f: 1 },
+    { n: "Whole wheat bread", s: "1 slice", cal: 80, p: 4, c: 14, f: 1 },
+    { n: "Bagel", s: "1 medium", cal: 250, p: 10, c: 49, f: 2 },
+    { n: "Baked potato", s: "1 medium", cal: 160, p: 4, c: 37, f: 0 },
+    { n: "Sweet potato", s: "1 medium", cal: 110, p: 2, c: 26, f: 0 },
+    { n: "Flour tortilla", s: "1 medium", cal: 140, p: 4, c: 24, f: 4 },
+    { n: "Quinoa", s: "1 cup cooked", cal: 220, p: 8, c: 39, f: 4 }
+  ],
+  Fruit: [
+    { n: "Banana", s: "1 medium", cal: 105, p: 1, c: 27, f: 0 },
+    { n: "Apple", s: "1 medium", cal: 95, p: 0, c: 25, f: 0 },
+    { n: "Orange", s: "1 medium", cal: 62, p: 1, c: 15, f: 0 },
+    { n: "Strawberries", s: "1 cup", cal: 50, p: 1, c: 12, f: 0 },
+    { n: "Blueberries", s: "1 cup", cal: 85, p: 1, c: 21, f: 0 },
+    { n: "Grapes", s: "1 cup", cal: 104, p: 1, c: 27, f: 0 },
+    { n: "Avocado", s: "1/2", cal: 120, p: 1, c: 6, f: 11 }
+  ],
+  Veg: [
+    { n: "Broccoli", s: "1 cup cooked", cal: 55, p: 4, c: 11, f: 1 },
+    { n: "Spinach", s: "1 cup raw", cal: 7, p: 1, c: 1, f: 0 },
+    { n: "Mixed salad", s: "2 cups", cal: 20, p: 2, c: 4, f: 0 },
+    { n: "Carrots", s: "1 cup", cal: 50, p: 1, c: 12, f: 0 },
+    { n: "Green beans", s: "1 cup", cal: 35, p: 2, c: 8, f: 0 },
+    { n: "Sweet corn", s: "1 cup", cal: 130, p: 5, c: 29, f: 2 }
+  ],
+  "Fats & nuts": [
+    { n: "Peanut butter", s: "2 tbsp", cal: 190, p: 8, c: 7, f: 16 },
+    { n: "Almonds", s: "1 oz (23)", cal: 165, p: 6, c: 6, f: 14 },
+    { n: "Olive oil", s: "1 tbsp", cal: 120, p: 0, c: 0, f: 14 }
+  ],
+  Snacks: [
+    { n: "Protein bar", s: "1 bar", cal: 220, p: 20, c: 24, f: 7 },
+    { n: "Rice cake", s: "1 cake", cal: 35, p: 1, c: 7, f: 0 },
+    { n: "Dark chocolate", s: "1 oz", cal: 170, p: 2, c: 13, f: 12 },
+    { n: "Hummus", s: "2 tbsp", cal: 70, p: 2, c: 6, f: 5 },
+    { n: "Potato chips", s: "1 oz", cal: 150, p: 2, c: 15, f: 10 },
+    { n: "Cheese pizza", s: "1 slice", cal: 285, p: 12, c: 36, f: 10 }
+  ],
+  Drinks: [
+    { n: "Orange juice", s: "1 cup", cal: 110, p: 2, c: 26, f: 0 },
+    { n: "Soda", s: "1 can", cal: 140, p: 0, c: 39, f: 0 },
+    { n: "Beer", s: "1 can", cal: 150, p: 2, c: 13, f: 0 },
+    { n: "Black coffee", s: "1 cup", cal: 5, p: 0, c: 0, f: 0 },
+    { n: "Sports drink", s: "20 oz", cal: 140, p: 0, c: 36, f: 0 }
+  ]
+};
 function dayCategory(name) {
   const n = (name || "").toLowerCase();
   if (/push|chest|shoulder|tricep/.test(n)) return "Push";
@@ -475,7 +577,7 @@ const Store = (() => {
   try { const t = "__il_test__"; localStorage.setItem(t, "1"); localStorage.removeItem(t); usable = true; } catch (e) { usable = false; }
   return { usable, load(k) { try { const r = usable ? localStorage.getItem(k) : mem[k]; return r ? JSON.parse(r) : null; } catch (e) { return null; } }, save(k, v) { const r = JSON.stringify(v); try { if (usable) localStorage.setItem(k, r); else mem[k] = r; } catch (e) { mem[k] = r; } } };
 })();
-const K_ENTRIES = "ironlog.entries", K_BODY = "ironlog.body", K_WORKOUTS = "ironlog.workouts", K_PLAN = "ironlog.plan";
+const K_ENTRIES = "ironlog.entries", K_BODY = "ironlog.body", K_WORKOUTS = "ironlog.workouts", K_PLAN = "ironlog.plan", K_FOOD = "ironlog.food";
 
 function entriesToWorkouts(arr) {
   const byDate = new Map();
@@ -496,11 +598,15 @@ if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 let activeTab = "log";
 let editingId = null, editUnit = "lb", openChooserId = null, exUnit = "lb", chartSel = "__bw__";
 let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepLowStr = "8", pickerRepHighStr = "", pickerCustomName = "";
-let pickerCMinStr = "30", pickerCDistStr = "", pickerCUnit = "mi";
+let pickerCMinStr = "30", pickerCDistStr = "", pickerCUnit = "mi", pickerCGoal = "time";
 let editorWid = null;
 let editPlanId = null;
 let pickerFail = false, peEditFail = false, addFail = false;
 let cardioOpen = false, cardioEditId = null, cardioAct = "Cycling", cardioMinStr = "", cardioDistStr = "", cardioUnit = "mi", cardioCalStr = "", cardioHrStr = "";
+let food = Store.load(K_FOOD) || { goalCal: null, days: {} };
+if (!food || typeof food !== "object" || !food.days) food = { goalCal: null, days: {} };
+const saveFood = () => Store.save(K_FOOD, food);
+let foodOpen = false, foodMode = "list", foodCat = "Protein", foodSelCat = "", foodSelIdx = -1, foodQtyStr = "1", fcName = "", fcCal = "", fcP = "", fcC = "", fcF = "";
 const planCollapsed = new Set();
 let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
 const expandedSet = new Set();
@@ -590,11 +696,13 @@ function currentSeries() {
 
 /* ---- log/workout html ---- */
 function cardioStatsText(e) {
-  const parts = ['<b>' + (e.minutes || 0) + ' min</b>'];
-  if (e.distance) parts.push(e.distance + " " + (e.distUnit || "mi"));
+  const parts = [];
+  if (e.minutes) parts.push('<b>' + e.minutes + ' min</b>');
+  if (e.distance) parts.push((e.minutes ? "" : "<b>") + e.distance + " " + (e.distUnit || "mi") + (e.minutes ? "" : "</b>"));
   if (e.distance && e.minutes && (e.distUnit === "mi" || e.distUnit === "km")) { const spd = round1(e.distance / (e.minutes / 60)); parts.push(spd + (e.distUnit === "km" ? " km/h" : " mph")); }
   if (e.calories) parts.push(e.calories + " cal");
   if (e.hr) parts.push(e.hr + " bpm");
+  if (!parts.length) parts.push('<span style="color:var(--dim)">not recorded yet</span>');
   return parts.join(" \u00b7 ");
 }
 function exBase(e) { return e.base || e.name; }
@@ -664,7 +772,7 @@ function startPromptHTML() {
 /* ---- plan html ---- */
 function planExHTML(d, pe) {
   if (pe.kind === "cardio") {
-    const sch = (pe.minutes || 0) + " min" + (pe.distance ? " \u00b7 " + pe.distance + " " + (pe.distUnit || "mi") : "");
+    const cp = []; if (pe.minutes) cp.push(pe.minutes + " min"); if (pe.distance) cp.push(pe.distance + " " + (pe.distUnit || "mi")); const sch = cp.join(" \u00b7 ") || "\u2014";
     return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span>' + exTitleHTML(pe) + '<span class="plan-ex-scheme">' + sch + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
   }
   if (editPlanId === pe.id) {
@@ -762,13 +870,13 @@ function renderChart() {
   if (series.length > 1) { const diff = round1(last - series[0].value); if (diff !== 0) txt += "  \u00b7  " + (diff > 0 ? "+" : "\u2212") + Math.abs(diff) + " " + u + " since " + fmtShort(series[0].date); }
   latest.textContent = txt;
 }
-function renderAll() { renderStats(); renderTop(); renderCards(); renderPlan(); renderBody(); renderChartSelect(); renderChart(); }
+function renderAll() { renderStats(); renderTop(); renderCards(); renderPlan(); renderBody(); renderChartSelect(); renderChart(); renderFood(); }
 
 function setTab(t) {
   activeTab = t;
-  ["log", "plan", "progress", "body"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
+  ["log", "plan", "progress", "body", "food"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
   document.querySelectorAll(".tabbar .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  const subs = { log: "Track your training and progress", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target" };
+  const subs = { log: "Track your training and progress", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target", food: "Log meals against your targets" };
   $("brand-sub").textContent = subs[t] || "";
   renderAll();
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -869,7 +977,7 @@ function saveHeight() {
   saveBody(); renderBody();
 }
 function exportData() {
-  const payload = { app: "onward", version: 4, workouts, body, plan };
+  const payload = { app: "onward", version: 5, workouts, body, plan, food };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob); const a = document.createElement("a");
   a.href = url; a.download = "onward-backup-" + todayISO() + ".json"; a.click(); URL.revokeObjectURL(url);
@@ -888,8 +996,9 @@ function importData(file) {
       workouts = next;
       if (data && data.body) { body = Object.assign(body, data.body); if (!Array.isArray(body.weights)) body.weights = []; }
       if (data && data.plan && Array.isArray(data.plan.days)) plan = data.plan;
+      if (data && data.food && typeof data.food === "object" && data.food.days) food = data.food;
       const tw = todayWorkout(); if (tw) expandedSet.add(tw.id);
-      save(); saveBody(); savePlan(); renderAll();
+      save(); saveBody(); savePlan(); saveFood(); renderAll();
     } catch (err) { alert("That file couldn't be read as an Onward backup."); }
   };
   reader.readAsText(file);
@@ -936,10 +1045,15 @@ function pickerAdd() {
   if (!name) { const el = document.querySelector(".picker-custom-name"); if (el) el.focus(); return; }
   let ex;
   if (pickerMovement && pickerMovement.cardio) {
-    const min = parseInt(pickerCMinStr, 10);
-    if (!Number.isFinite(min) || min <= 0) { alert("Enter target minutes."); return; }
-    const dist = pickerCDistStr.trim() === "" ? null : (parseFloat(pickerCDistStr) > 0 ? parseFloat(pickerCDistStr) : null);
-    ex = { id: uid(), kind: "cardio", name: name, minutes: min, distance: dist, distUnit: pickerCUnit };
+    if (pickerCGoal === "dist") {
+      const dist = parseFloat(pickerCDistStr);
+      if (!Number.isFinite(dist) || dist <= 0) { alert("Enter a distance goal."); return; }
+      ex = { id: uid(), kind: "cardio", name: name, goal: "dist", minutes: null, distance: dist, distUnit: pickerCUnit };
+    } else {
+      const min = parseInt(pickerCMinStr, 10);
+      if (!Number.isFinite(min) || min <= 0) { alert("Enter a time goal in minutes."); return; }
+      ex = { id: uid(), kind: "cardio", name: name, goal: "time", minutes: min, distance: null, distUnit: pickerCUnit };
+    }
   } else {
     const sets = parseInt(pickerSetsStr, 10);
     if (!Number.isFinite(sets) || sets <= 0) { alert("Enter a whole number of sets."); return; }
@@ -978,7 +1092,11 @@ function renderPicker() {
     let srSection;
     if (isCardio) {
       const units = ["mi", "km", "m"].map(u => '<button type="button" class="' + (pickerCUnit === u ? "on" : "") + '" data-action="picker-cunit" data-u="' + u + '">' + u + '</button>').join("");
-      srSection = '<div class="pick-sub">Target</div><div class="pick-srgrid"><div><div class="pick-lbl">Minutes</div><input type="text" class="num picker-cmin" inputmode="numeric" value="' + esc(pickerCMinStr) + '"></div><div><div class="pick-lbl">Distance <span class="opt">(opt)</span></div><input type="text" class="num picker-cdist" inputmode="decimal" value="' + esc(pickerCDistStr) + '" placeholder="\u2014"></div><div><div class="pick-lbl">Unit</div><div class="seg" style="width:100%">' + units + '</div></div></div>';
+      const goalToggle = '<div class="pick-subrow"><span class="pick-sub">Goal</span><div class="seg"><button type="button" class="' + (pickerCGoal === "time" ? "on" : "") + '" data-action="picker-cgoal" data-g="time">Time</button><button type="button" class="' + (pickerCGoal === "dist" ? "on" : "") + '" data-action="picker-cgoal" data-g="dist">Distance</button></div></div>';
+      const goalField = pickerCGoal === "dist"
+        ? '<div class="pick-lbl">Distance goal</div><div class="inline-row"><input type="text" class="num picker-cdist" inputmode="decimal" value="' + esc(pickerCDistStr) + '" placeholder="0"><div class="seg">' + units + '</div></div>'
+        : '<div class="pick-lbl">Time goal (min)</div><input type="text" class="num picker-cmin" inputmode="numeric" value="' + esc(pickerCMinStr) + '" placeholder="30" style="max-width:160px">';
+      srSection = goalToggle + '<div style="margin-bottom:14px;">' + goalField + '</div>';
     } else {
       srSection = '<div class="pick-subrow"><span class="pick-sub">Sets &amp; reps</span><button type="button" class="failtoggle' + (pickerFail ? " on" : "") + '" data-action="picker-fail">To failure</button></div>' + (pickerFail ? '<div class="pick-failrow"><div class="pick-failsets"><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div class="pick-failnote">\u00d7 reps to failure</div></div>' : '<div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num picker-sets" inputmode="numeric" value="' + esc(pickerSetsStr) + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num picker-rep-low" inputmode="numeric" value="' + esc(pickerRepLowStr) + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num picker-rep-high" inputmode="numeric" value="' + esc(pickerRepHighStr) + '" placeholder="\u2014"></div></div>');
     }
@@ -996,10 +1114,11 @@ function onPickerClick(e) {
   const a = btn.dataset.action;
   if (a === "picker-close") { pickerDay = null; renderPicker(); }
   else if (a === "picker-cat") { pickerCat = btn.dataset.cat; renderPicker(); }
-  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; pickerFail = false; pickerCMinStr = "30"; pickerCDistStr = ""; pickerCUnit = "mi"; renderPicker(); }
+  else if (a === "picker-move") { const it = CATALOG[btn.dataset.cat][+btn.dataset.idx]; pickerMovement = it; pickerEquip = (it.eq && it.eq.length) ? it.eq[0] : null; pickerVar = null; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; pickerFail = false; pickerCMinStr = "30"; pickerCDistStr = ""; pickerCUnit = "mi"; pickerCGoal = "time"; renderPicker(); }
   else if (a === "picker-custom") { pickerMovement = { custom: true }; pickerEquip = null; pickerVar = null; pickerCustomName = ""; pickerSetsStr = "3"; pickerRepLowStr = "8"; pickerRepHighStr = ""; pickerFail = false; renderPicker(); }
   else if (a === "picker-fail") { pickerFail = !pickerFail; renderPicker(); }
   else if (a === "picker-cunit") { pickerCUnit = btn.dataset.u; renderPicker(); }
+  else if (a === "picker-cgoal") { pickerCGoal = btn.dataset.g; renderPicker(); }
   else if (a === "picker-back") { pickerMovement = null; renderPicker(); }
   else if (a === "picker-equip") { pickerEquip = btn.dataset.v; renderPicker(); }
   else if (a === "picker-var") { pickerVar = (pickerVar === btn.dataset.v ? null : btn.dataset.v); renderPicker(); }
@@ -1144,9 +1263,9 @@ function renderCardio() {
   box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
 }
 function cardioSave() {
-  const min = parseInt(cardioMinStr, 10);
-  if (!Number.isFinite(min) || min <= 0) { alert("Enter the duration in minutes."); return; }
+  const min = cardioMinStr.trim() === "" ? null : (Number.isFinite(parseInt(cardioMinStr, 10)) && parseInt(cardioMinStr, 10) > 0 ? parseInt(cardioMinStr, 10) : null);
   const dist = cardioDistStr.trim() === "" ? null : (Number.isFinite(parseFloat(cardioDistStr)) && parseFloat(cardioDistStr) > 0 ? parseFloat(cardioDistStr) : null);
+  if (min == null && dist == null) { alert("Enter a duration or a distance."); return; }
   const cal = cardioCalStr.trim() === "" ? null : (Number.isFinite(parseInt(cardioCalStr, 10)) && parseInt(cardioCalStr, 10) >= 0 ? parseInt(cardioCalStr, 10) : null);
   const hr = cardioHrStr.trim() === "" ? null : (Number.isFinite(parseInt(cardioHrStr, 10)) && parseInt(cardioHrStr, 10) > 0 ? parseInt(cardioHrStr, 10) : null);
   if (cardioEditId) { const c = findEntryCtx(cardioEditId); if (c) Object.assign(c.e, { name: cardioAct, minutes: min, distance: dist, distUnit: cardioUnit, calories: cal, hr: hr }); }
@@ -1179,7 +1298,7 @@ function logWorkoutFromPlan(did) {
   const ids = [];
   d.exercises.forEach((pe, i) => {
     const id = uid();
-    if (pe.kind === "cardio") { w.entries.push({ id: id, kind: "cardio", name: pe.name, minutes: pe.minutes || 0, distance: pe.distance || null, distUnit: pe.distUnit || "mi", calories: null, hr: null, ts: Date.now() + i }); }
+    if (pe.kind === "cardio") { w.entries.push({ id: id, kind: "cardio", name: pe.name, minutes: pe.minutes || null, distance: pe.distance || null, distUnit: pe.distUnit || "mi", calories: null, hr: null, ts: Date.now() + i }); }
     else { const prev = lastEntryFor(pe.name, todayISO()); w.entries.push({ id: id, name: pe.name, base: pe.base, mods: pe.mods, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, toFailure: !!pe.toFailure, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); ids.push(id); }
   });
   save();
@@ -1232,6 +1351,116 @@ function onFlowInput(e) {
   else if (t.classList.contains("flow-reps")) flowRepsStr = t.value;
 }
 
+/* ---- food logging ---- */
+function round0(n) { return Math.round(n); }
+function todayFoods() { const t = todayISO(); if (!food.days[t]) food.days[t] = []; return food.days[t]; }
+function foodTotals(list) { let cal = 0, p = 0, c = 0, f = 0; list.forEach(x => { cal += x.cal || 0; p += x.p || 0; c += x.c || 0; f += x.f || 0; }); return { cal: cal, p: p, c: c, f: f }; }
+function proteinTarget() { const lw = latestWeightKg(); if (lw == null || lw <= 0) return null; const mult = ({ maintain: [1.4, 1.8], build: [1.6, 2.2], cut: [1.8, 2.4] })[body.goal] || [1.6, 2.2]; return { low: Math.round(lw * mult[0]), high: Math.round(lw * mult[1]) }; }
+function foodSelObj() { return (FOODS[foodSelCat] || [])[foodSelIdx] || null; }
+
+function renderFood() {
+  const list = todayFoods();
+  const t = foodTotals(list);
+  const pt = proteinTarget();
+  let calBar = "";
+  if (food.goalCal) { const pct = Math.min(100, Math.round(t.cal / food.goalCal * 100)); const over = t.cal > food.goalCal; calBar = '<div class="fbar"><div class="fbar-fill' + (over ? " over" : "") + '" style="width:' + pct + '%"></div></div>'; }
+  const calSub = food.goalCal ? ('of ' + food.goalCal + ' cal' + (t.cal > food.goalCal ? ' \u00b7 ' + (t.cal - food.goalCal) + ' over' : '')) : "cal today";
+  let pRef = "", pBar = "";
+  if (pt) { pRef = ' <span class="fm-ref">/ ' + pt.low + "\u2013" + pt.high + '</span>'; const pct = Math.min(100, Math.round(t.p / pt.low * 100)); const hit = t.p >= pt.low; pBar = '<div class="fbar sm"><div class="fbar-fill' + (hit ? " good" : "") + '" style="width:' + pct + '%"></div></div>'; }
+  const totalsCard = '<div class="card pad food-totals">' +
+    '<div class="food-cal-big">' + round0(t.cal) + '</div><div class="food-cal-sub">' + calSub + '</div>' + calBar +
+    '<div class="food-macros">' +
+      '<div class="fmacro"><div class="fm-label">Protein</div><div class="fm-val">' + round0(t.p) + 'g' + pRef + '</div>' + pBar + '</div>' +
+      '<div class="fmacro"><div class="fm-label">Carbs</div><div class="fm-val">' + round0(t.c) + 'g</div></div>' +
+      '<div class="fmacro"><div class="fm-label">Fat</div><div class="fm-val">' + round0(t.f) + 'g</div></div>' +
+    '</div></div>';
+  const rows = list.length ? list.map(function (x) {
+    return '<div class="entry"><div class="entry-top"><div class="ex-title"><span class="entry-name">' + esc(x.name) + '</span></div><div class="entry-right"><button class="icon-btn danger" data-action="food-del" data-id="' + x.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div>' +
+      '<div class="cardio-stats"><b>' + round0(x.cal) + ' cal</b> \u00b7 ' + round0(x.p) + 'g P \u00b7 ' + round0(x.c) + 'g C \u00b7 ' + round0(x.f) + 'g F</div></div>';
+  }).join("") : '<div class="empty">No food logged today. Tap "Add food" to start.</div>';
+  const goalRow = '<div class="food-goalrow"><span class="pick-sub">Daily calorie goal</span><input type="text" class="num" id="food-goal" inputmode="numeric" value="' + (food.goalCal || "") + '" placeholder="optional"></div>';
+  $("food-content").innerHTML = totalsCard +
+    '<button class="btn-primary" data-action="add-food" style="margin-top:10px;"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add food</button>' +
+    '<p class="eyebrow" style="margin-top:26px;">Today\u2019s food</p><div>' + rows + '</div>' + goalRow;
+}
+function onFoodPageClick(e) {
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "add-food") openFoodSheet();
+  else if (a === "food-del") { const t = todayISO(); food.days[t] = (food.days[t] || []).filter(x => x.id !== btn.dataset.id); saveFood(); renderFood(); }
+}
+function onFoodPageInput(e) { if (e.target.id === "food-goal") { const v = parseInt(e.target.value, 10); food.goalCal = (Number.isFinite(v) && v > 0) ? v : null; saveFood(); } }
+function onFoodPageChange(e) { if (e.target.id === "food-goal") renderFood(); }
+
+function openFoodSheet() { foodOpen = true; foodMode = "list"; foodCat = "Protein"; renderFoodSheet(); }
+function renderFoodSheet() {
+  const box = $("foodsheet");
+  if (!foodOpen) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  let inner = "";
+  if (foodMode === "list") {
+    const catChips = FOOD_CATS.map(c => '<button class="chip-btn' + (foodCat === c ? " on" : "") + '" data-action="food-cat" data-c="' + esc(c) + '">' + esc(c) + '</button>').join("");
+    const items = (FOODS[foodCat] || []).map((it, idx) => '<button class="pick-item" data-action="food-pick" data-c="' + esc(foodCat) + '" data-idx="' + idx + '"><span class="food-item-name">' + esc(it.n) + '<span class="food-item-serv">' + esc(it.s) + '</span></span><span class="food-item-cal">' + it.cal + ' cal</span></button>').join("");
+    inner = '<div class="pick-head"><span style="width:34px"></span><div class="pick-title">Add food</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<div class="chips" style="margin-bottom:14px;">' + catChips + '</div>' +
+      '<div class="pick-list">' + items + '<button class="pick-item custom" data-action="food-custom"><span>Custom food\u2026</span>' + SVG.caretR + '</button></div>';
+  } else if (foodMode === "detail") {
+    const it = foodSelObj();
+    if (!it) { foodMode = "list"; renderFoodSheet(); return; }
+    const q = parseFloat(foodQtyStr); const mult = Number.isFinite(q) && q > 0 ? q : 1;
+    inner = '<div class="pick-head"><button class="icon-btn" data-action="food-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">' + esc(it.n) + '</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<div class="food-detail-serv">Per serving: ' + esc(it.s) + ' \u00b7 ' + it.cal + ' cal</div>' +
+      '<div class="pick-lbl" style="margin-top:16px;">Servings</div><input type="text" class="num food-qty" inputmode="decimal" value="' + esc(foodQtyStr) + '" style="max-width:140px">' +
+      '<div class="food-preview"><b>' + round0(it.cal * mult) + ' cal</b> \u00b7 ' + round0(it.p * mult) + 'g protein \u00b7 ' + round0(it.c * mult) + 'g carbs \u00b7 ' + round0(it.f * mult) + 'g fat</div>' +
+      '<button class="btn-primary" data-action="food-add">Add to today</button>';
+  } else {
+    inner = '<div class="pick-head"><button class="icon-btn" data-action="food-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">Custom food</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<input type="text" class="fc-name" placeholder="Food name" value="' + esc(fcName) + '" style="margin-bottom:12px;">' +
+      '<div class="cardio-grid"><div><div class="pick-lbl">Calories</div><input type="text" class="num fc-cal" inputmode="numeric" value="' + esc(fcCal) + '"></div>' +
+      '<div><div class="pick-lbl">Protein (g)</div><input type="text" class="num fc-p" inputmode="numeric" value="' + esc(fcP) + '"></div>' +
+      '<div><div class="pick-lbl">Carbs (g)</div><input type="text" class="num fc-c" inputmode="numeric" value="' + esc(fcC) + '"></div>' +
+      '<div><div class="pick-lbl">Fat (g)</div><input type="text" class="num fc-f" inputmode="numeric" value="' + esc(fcF) + '"></div></div>' +
+      '<button class="btn-primary" data-action="food-add-custom" style="margin-top:8px;">Add to today</button>';
+  }
+  box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
+}
+function foodAdd() {
+  const it = foodSelObj(); if (!it) return;
+  const q = parseFloat(foodQtyStr); const mult = Number.isFinite(q) && q > 0 ? q : 1;
+  const name = it.n + (mult !== 1 ? " \u00d7" + (Math.round(mult * 100) / 100) : "");
+  todayFoods().push({ id: uid(), name: name, cal: round0(it.cal * mult), p: round0(it.p * mult), c: round0(it.c * mult), f: round0(it.f * mult) });
+  saveFood(); foodMode = "list"; renderFoodSheet(); renderFood();
+}
+function foodAddCustom() {
+  const name = fcName.trim(); if (!name) { alert("Enter a food name."); return; }
+  const cal = parseInt(fcCal, 10); if (!Number.isFinite(cal) || cal < 0) { alert("Enter calories."); return; }
+  const p = parseInt(fcP, 10), c = parseInt(fcC, 10), f = parseInt(fcF, 10);
+  todayFoods().push({ id: uid(), name: name, cal: cal, p: Number.isFinite(p) ? p : 0, c: Number.isFinite(c) ? c : 0, f: Number.isFinite(f) ? f : 0 });
+  saveFood(); fcName = ""; fcCal = ""; fcP = ""; fcC = ""; fcF = ""; foodMode = "list"; renderFoodSheet(); renderFood();
+}
+function onFoodClick(e) {
+  if (e.target.id === "foodsheet") { foodOpen = false; renderFoodSheet(); return; }
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "food-close") { foodOpen = false; renderFoodSheet(); }
+  else if (a === "food-cat") { foodCat = btn.dataset.c; renderFoodSheet(); }
+  else if (a === "food-pick") { foodSelCat = btn.dataset.c; foodSelIdx = +btn.dataset.idx; foodQtyStr = "1"; foodMode = "detail"; renderFoodSheet(); }
+  else if (a === "food-custom") { foodMode = "custom"; renderFoodSheet(); }
+  else if (a === "food-back") { foodMode = "list"; renderFoodSheet(); }
+  else if (a === "food-add") foodAdd();
+  else if (a === "food-add-custom") foodAddCustom();
+}
+function onFoodInput(e) {
+  const t = e.target;
+  if (t.classList.contains("food-qty")) foodQtyStr = t.value;
+  else if (t.classList.contains("fc-name")) fcName = t.value;
+  else if (t.classList.contains("fc-cal")) fcCal = t.value;
+  else if (t.classList.contains("fc-p")) fcP = t.value;
+  else if (t.classList.contains("fc-c")) fcC = t.value;
+  else if (t.classList.contains("fc-f")) fcF = t.value;
+}
+function onFoodChange(e) { if (e.target.classList.contains("food-qty")) renderFoodSheet(); }
+
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
 $("ex-name").addEventListener("input", updateHint);
@@ -1255,6 +1484,12 @@ $("cardio").addEventListener("input", onCardioInput);
 $("add-cardio-btn").addEventListener("click", () => openCardio(null));
 $("logflow").addEventListener("click", onFlowClick);
 $("logflow").addEventListener("input", onFlowInput);
+$("food-content").addEventListener("click", onFoodPageClick);
+$("food-content").addEventListener("input", onFoodPageInput);
+$("food-content").addEventListener("change", onFoodPageChange);
+$("foodsheet").addEventListener("click", onFoodClick);
+$("foodsheet").addEventListener("input", onFoodInput);
+$("foodsheet").addEventListener("change", onFoodChange);
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
