@@ -192,7 +192,7 @@
   .tab.on { color: var(--ink); }
 
   /* exercise picker */
-  #picker { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  #picker, #editor { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
   .pick-panel { background: var(--surface); width: 100%; max-width: 540px; border-radius: 20px 20px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
   .pick-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
   .pick-title { flex: 1; font-size: 17px; font-weight: 700; color: var(--text); text-align: center; }
@@ -212,6 +212,12 @@
   .pick-lbl { font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; margin-bottom: 6px; }
   .pick-lbl .opt { text-transform: none; letter-spacing: 0; color: var(--dim); font-weight: 400; }
   .pick-srgrid input.num { width: 100%; min-height: 46px; }
+  .ed-card { background: #FBFBF9; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; margin-bottom: 10px; }
+  .ed-name-row { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+  .ed-nm { font-size: 15px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ed-last { font-size: 12px; color: var(--muted); margin: 4px 0 10px; }
+  .ed-last b { color: var(--text); font-weight: 600; }
+  .ex-last { font-size: 12px; color: var(--dim); margin-top: 6px; font-variant-numeric: tabular-nums; }
 
   /* drag to reorder */
   .plan-ex-list { display: flex; flex-direction: column; }
@@ -326,6 +332,7 @@
   </div></nav>
 
   <div id="picker"></div>
+  <div id="editor"></div>
 
 <script>
 "use strict";
@@ -409,7 +416,9 @@ const SVG = {
   caretR: '<svg class="ic ic-sm" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>',
   caretL: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 6l-6 6 6 6"/></svg>',
   close: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12"/><path d="M18 6L6 18"/></svg>',
-  grip: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>'
+  grip: '<svg class="ic" viewBox="0 0 24 24" fill="currentColor"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>',
+  up: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 15l6-6 6 6"/></svg>',
+  down: '<svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>'
 };
 
 function uid() { return Date.now().toString(36) + Math.random().toString(36).slice(2, 6); }
@@ -442,6 +451,7 @@ if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 let activeTab = "log";
 let editingId = null, editUnit = "lb", openChooserId = null, exUnit = "lb", chartSel = "__bw__";
 let pickerDay = null, pickerCat = "All", pickerMovement = null, pickerEquip = null, pickerVar = null, pickerSetsStr = "3", pickerRepLowStr = "8", pickerRepHighStr = "", pickerCustomName = "";
+let editorWid = null;
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -527,12 +537,13 @@ function currentSeries() {
 
 /* ---- log/workout html ---- */
 function entryDisplayHTML(w, e) {
-  const d = computeDelta(e, lastEntryFor(e.name, w.date));
+  const prev = lastEntryFor(e.name, w.date);
+  const d = computeDelta(e, prev);
   const chip = d ? '<span class="chip ' + d.dir + '">' + esc(d.text) + '</span>' : "";
+  const last = prev ? '<div class="ex-last">Last: ' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + " \u00b7 " + fmtShort(prev.date) + '</div>' : "";
   return '<div class="entry"><div class="entry-top"><div class="entry-name">' + esc(e.name) + '</div><div class="entry-right">' + chip +
-    '<button class="icon-btn" data-action="edit-ex" data-id="' + e.id + '" aria-label="Edit">' + SVG.pencil + '</button>' +
     '<button class="icon-btn danger" data-action="del-ex" data-id="' + e.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div>' +
-    '<div class="stats"><span>' + weightText(e) + '</span><span><span class="x">\u00d7</span> ' + repText(e) + ' reps</span><span><span class="x">\u00d7</span> ' + e.sets + ' sets</span></div></div>';
+    '<div class="stats"><span>' + weightText(e) + '</span><span><span class="x">\u00d7</span> ' + repText(e) + ' reps</span><span><span class="x">\u00d7</span> ' + e.sets + ' sets</span></div>' + last + '</div>';
 }
 function entryEditHTML(w, e) {
   const seg = '<div class="seg" style="margin-top:8px;"><button type="button" class="' + (editUnit === "lb" ? "on" : "") + '" data-action="ed-unit" data-u="lb">lb</button><button type="button" class="' + (editUnit === "kg" ? "on" : "") + '" data-action="ed-unit" data-u="kg">kg</button></div>';
@@ -556,8 +567,9 @@ function workoutCardHTML(w) {
   let bodyHtml = "";
   if (expanded) {
     const chooser = openChooserId === w.id ? typeChooserHTML(w) : '<button class="link-btn change" data-action="edit-type" data-wid="' + w.id + '">' + SVG.pencil + ' Change day label</button>';
-    const rows = w.entries.length ? w.entries.map(e => (e.id === editingId ? entryEditHTML(w, e) : entryDisplayHTML(w, e))).join("") : '<div class="empty small">No exercises yet.' + (isToday ? " Add one below." : "") + '</div>';
-    bodyHtml = '<div class="wk-body">' + chooser + rows + '<div class="wk-foot"><button class="link-btn danger" data-action="del-workout" data-wid="' + w.id + '">' + SVG.trash + ' Delete workout</button></div></div>';
+    const rows = w.entries.length ? w.entries.map(e => entryDisplayHTML(w, e)).join("") : '<div class="empty small">No exercises yet.' + (isToday ? " Add one below." : "") + '</div>';
+    const editBtn = w.entries.length ? '<button class="btn-ghost wide" data-action="edit-workout" data-wid="' + w.id + '" style="margin-top:2px;">Edit weights &amp; reps</button>' : "";
+    bodyHtml = '<div class="wk-body">' + chooser + rows + editBtn + '<div class="wk-foot"><button class="link-btn danger" data-action="del-workout" data-wid="' + w.id + '">' + SVG.trash + ' Delete workout</button></div></div>';
   }
   return '<div class="wk-card">' + main + bodyHtml + '</div>';
 }
@@ -574,11 +586,13 @@ function startPromptHTML() {
 }
 
 /* ---- plan html ---- */
-function planExHTML(d, pe) {
-  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
+function planExHTML(d, pe, idx, total) {
+  const up = idx > 0 ? '<button class="icon-btn" data-action="pe-up" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Move up">' + SVG.up + '</button>' : '<span class="icon-btn" style="visibility:hidden"></span>';
+  const down = idx < total - 1 ? '<button class="icon-btn" data-action="pe-down" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Move down">' + SVG.down + '</button>' : '<span class="icon-btn" style="visibility:hidden"></span>';
+  return '<div class="plan-ex"><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span>' + up + down + '<button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
-  const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises planned yet.</div>';
+  const rows = d.exercises.length ? d.exercises.map((pe, i) => planExHTML(d, pe, i, d.exercises.length)).join("") : '<div class="empty small">No exercises planned yet.</div>';
   return '<div class="wk-card"><div class="plan-day-head"><input type="text" class="plan-day-name" data-action="rename-day" data-did="' + d.id + '" value="' + esc(d.name) + '"><button class="icon-btn danger" data-action="del-day" data-did="' + d.id + '" aria-label="Delete day">' + SVG.trash + '</button></div>' +
     '<div class="plan-ex-list" data-did="' + d.id + '">' + rows + '</div>' +
     '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
@@ -693,7 +707,7 @@ function startFromPlan(did) {
   const w = ensureTodayWorkout();
   if (w.entries.length && !confirm('Add the "' + d.name + '" exercises to today\u2019s workout?')) return;
   w.type = d.name;
-  d.exercises.forEach((pe, i) => w.entries.push({ id: uid(), name: pe.name, weight: null, reps: pe.reps, repMax: pe.repMax || null, sets: pe.sets, unit: exUnit, ts: Date.now() + i }));
+  d.exercises.forEach((pe, i) => { const prev = lastEntryFor(pe.name, todayISO()); w.entries.push({ id: uid(), name: pe.name, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); });
   openChooserId = null; save(); renderAll();
 }
 function setType(wid, type) { const w = findWorkout(wid); if (!w) return; w.type = (type || "").trim(); openChooserId = null; save(); renderAll(); }
@@ -803,6 +817,9 @@ function onCardAction(e) {
   else if (a === "del-day") delDay(did);
   else if (a === "open-picker") openPicker(did);
   else if (a === "del-plan-ex") delPlanEx(did, btn.dataset.eid);
+  else if (a === "pe-up") moveEx(did, btn.dataset.eid, -1);
+  else if (a === "pe-down") moveEx(did, btn.dataset.eid, 1);
+  else if (a === "edit-workout") openEditor(wid);
   else if (a === "reset-plan") resetPlan();
 }
 function onPlanChange(e) { const el = e.target.closest('[data-action="rename-day"]'); if (el) renameDay(el.dataset.did, el.value); }
@@ -908,6 +925,55 @@ function onPointerUp() {
   renderPlan();
 }
 
+/* ---- reorder planned exercises ---- */
+function moveEx(did, eid, dir) {
+  const d = plan.days.find(x => x.id === did); if (!d) return;
+  const i = d.exercises.findIndex(x => x.id === eid); if (i < 0) return;
+  const j = i + dir; if (j < 0 || j >= d.exercises.length) return;
+  const tmp = d.exercises[i]; d.exercises[i] = d.exercises[j]; d.exercises[j] = tmp;
+  savePlan(); renderPlan();
+}
+
+/* ---- edit-workout overlay ---- */
+function openEditor(wid) { editorWid = wid; renderEditor(); }
+function editorRowHTML(w, e) {
+  const prev = lastEntryFor(e.name, w.date);
+  const last = prev ? '<div class="ed-last">Last time: <b>' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + '</b> \u00b7 ' + fmtShort(prev.date) + '</div>' : '<div class="ed-last">First time \u2014 no previous data</div>';
+  return '<div class="ed-card"><div class="ed-name-row"><span class="ed-nm">' + esc(e.name) + '</span><button class="icon-btn danger" data-action="editor-del" data-id="' + e.id + '" aria-label="Remove">' + SVG.trash + '</button></div>' + last +
+    '<div class="pick-srgrid"><div><div class="pick-lbl">Weight (' + e.unit + ')</div><input type="text" class="num" data-eid="' + e.id + '" data-field="weight" inputmode="decimal" value="' + (e.weight == null ? "" : e.weight) + '" placeholder="\u2014"></div>' +
+    '<div><div class="pick-lbl">Reps</div><input type="text" class="num" data-eid="' + e.id + '" data-field="reps" inputmode="numeric" value="' + esc(repText(e)) + '"></div>' +
+    '<div><div class="pick-lbl">Sets</div><input type="text" class="num" data-eid="' + e.id + '" data-field="sets" inputmode="numeric" value="' + e.sets + '"></div></div></div>';
+}
+function renderEditor() {
+  const box = $("editor");
+  const w = editorWid ? findWorkout(editorWid) : null;
+  if (!w) { editorWid = null; box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  const title = w.type ? esc(w.type) : "Workout";
+  const rows = w.entries.length ? w.entries.map(e => editorRowHTML(w, e)).join("") : '<div class="empty small">No exercises. Add some from the Log page.</div>';
+  box.innerHTML = '<div class="pick-panel"><div class="pick-head"><span style="width:34px"></span><div class="pick-title">Edit \u00b7 ' + title + '</div><button class="icon-btn" data-action="editor-close" aria-label="Close">' + SVG.close + '</button></div>' + rows + '<button class="btn-primary" data-action="editor-close" style="margin-top:6px;">Done</button></div>';
+}
+function editorDel(id) {
+  const c = findEntryCtx(id); if (!c) return;
+  if (!confirm('Remove "' + c.e.name + '"?')) return;
+  c.w.entries = c.w.entries.filter(x => x.id !== id);
+  save(); renderEditor();
+}
+function onEditorClick(e) {
+  if (e.target.id === "editor") { save(); editorWid = null; renderEditor(); renderAll(); return; }
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "editor-close") { save(); editorWid = null; renderEditor(); renderAll(); }
+  else if (a === "editor-del") editorDel(btn.dataset.id);
+}
+function onEditorInput(e) {
+  const el = e.target, eid = el.dataset.eid, field = el.dataset.field; if (!eid || !field) return;
+  const c = findEntryCtx(eid); if (!c) return;
+  if (field === "weight") { const v = el.value.trim(); if (v === "") c.e.weight = null; else { const f = parseFloat(v); if (Number.isFinite(f) && f >= 0) c.e.weight = f; } }
+  else if (field === "reps") { const rr = parseRepsField(el.value); if (rr) { c.e.reps = rr.reps; c.e.repMax = rr.repMax; } }
+  else if (field === "sets") { const s = parseInt(el.value, 10); if (Number.isFinite(s) && s > 0) c.e.sets = s; }
+}
+
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
 $("ex-name").addEventListener("input", updateHint);
@@ -919,6 +985,8 @@ $("plan-content").addEventListener("change", onPlanChange);
 $("picker").addEventListener("click", onPickerClick);
 $("picker").addEventListener("input", onPickerInput);
 $("plan-content").addEventListener("pointerdown", onPointerDown);
+$("editor").addEventListener("click", onEditorClick);
+$("editor").addEventListener("input", onEditorInput);
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
