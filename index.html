@@ -124,7 +124,10 @@
   .link-btn.danger:hover { color: #DC2626; }
 
   .entry { background: #FBFBF9; border: 1px solid var(--line); border-radius: 12px; padding: 12px 13px; margin-bottom: 8px; }
-  .entry-top { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+  .entry-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; margin-bottom: 7px; }
+  .ex-title { display: flex; flex-direction: column; gap: 5px; flex: 1; min-width: 0; }
+  .ex-mods { display: flex; flex-wrap: wrap; gap: 5px; }
+  .ex-mod { font-size: 11px; font-weight: 600; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); padding: 2px 8px; border-radius: 999px; white-space: nowrap; text-transform: lowercase; }
   .entry-name { font-size: 15.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .entry-right { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
   .chip { font-size: 12px; font-weight: 600; padding: 3px 9px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; }
@@ -150,7 +153,9 @@
   .plan-splitname { font-size: 15px; font-weight: 700; color: var(--text); }
   .plan-day-head { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; }
   .plan-day-name { flex: 1; font-weight: 700 !important; font-size: 16px !important; }
-  .plan-ex { display: flex; align-items: center; gap: 10px; padding: 9px 12px; background: #FBFBF9; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 7px; }
+  .plan-ex { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; background: #FBFBF9; border: 1px solid var(--line); border-radius: 10px; margin-bottom: 7px; }
+  .plan-ex .plan-ex-scheme { padding-top: 1px; }
+  .plan-ex .icon-btn { margin-top: -4px; }
   .plan-ex-name-txt { flex: 1; font-size: 14.5px; font-weight: 600; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
   .plan-ex-scheme { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .plan-addrow { margin-top: 10px; }
@@ -364,7 +369,7 @@
   <div id="editor"></div>
   <div id="cardio"></div>
   <div id="logflow"></div>
-  <div id="version">v17</div>
+  <div id="version">v18</div>
 
 <script>
 "use strict";
@@ -589,6 +594,13 @@ function cardioStatsText(e) {
   if (e.hr) parts.push(e.hr + " bpm");
   return parts.join(" \u00b7 ");
 }
+function exBase(e) { return e.base || e.name; }
+function exMods(e) { return Array.isArray(e.mods) ? e.mods : []; }
+function exTitleHTML(e) {
+  const mods = exMods(e);
+  const chips = mods.length ? '<div class="ex-mods">' + mods.map(m => '<span class="ex-mod">' + esc(m) + '</span>').join("") + '</div>' : "";
+  return '<div class="ex-title"><span class="entry-name">' + esc(exBase(e)) + '</span>' + chips + '</div>';
+}
 function entryDisplayHTML(w, e) {
   if (e.kind === "cardio") {
     return '<div class="entry"><div class="entry-top"><div class="entry-name">' + esc(e.name) + '</div><div class="entry-right"><span class="chip cardio-chip">cardio</span><button class="icon-btn" data-action="cardio-edit" data-id="' + e.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-ex" data-id="' + e.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div><div class="cardio-stats">' + SVG.pulse + ' ' + cardioStatsText(e) + '</div></div>';
@@ -597,7 +609,7 @@ function entryDisplayHTML(w, e) {
   const d = computeDelta(e, prev);
   const chip = d ? '<span class="chip ' + d.dir + '">' + esc(d.text) + '</span>' : "";
   const last = prev ? '<div class="ex-last">Last: ' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + " \u00b7 " + fmtShort(prev.date) + '</div>' : "";
-  return '<div class="entry"><div class="entry-top"><div class="entry-name">' + esc(e.name) + '</div><div class="entry-right">' + chip +
+  return '<div class="entry"><div class="entry-top">' + exTitleHTML(e) + '<div class="entry-right">' + chip +
     '<button class="icon-btn danger" data-action="del-ex" data-id="' + e.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div>' +
     '<div class="stats"><span>' + weightText(e) + '</span><span><span class="x">\u00d7</span> ' + (e.toFailure ? "failure" : repText(e) + " reps") + '</span><span><span class="x">\u00d7</span> ' + e.sets + ' sets</span></div>' + last + '</div>';
 }
@@ -652,7 +664,7 @@ function planExHTML(d, pe) {
     const srBlock = peEditFail ? '<div class="pick-failrow"><div class="pick-failsets"><div class="pick-lbl">Sets</div><input type="text" class="num pe-ed-sets" inputmode="numeric" value="' + pe.sets + '"></div><div class="pick-failnote">\u00d7 reps to failure</div></div>' : '<div class="pick-srgrid"><div><div class="pick-lbl">Sets</div><input type="text" class="num pe-ed-sets" inputmode="numeric" value="' + pe.sets + '"></div><div><div class="pick-lbl">Reps</div><input type="text" class="num pe-ed-replow" inputmode="numeric" value="' + pe.reps + '"></div><div><div class="pick-lbl">to <span class="opt">(opt)</span></div><input type="text" class="num pe-ed-rephigh" inputmode="numeric" value="' + (pe.repMax || "") + '" placeholder="\u2014"></div></div>';
     return '<div class="plan-ex-edit"><input type="text" class="pe-ed-name" value="' + esc(pe.name) + '"><div class="pick-subrow"><span class="pick-sub">Sets &amp; reps</span><button type="button" class="failtoggle' + (peEditFail ? " on" : "") + '" data-action="pe-editfail">To failure</button></div>' + srBlock + '<div class="ed-actions"><button class="btn-mini save" data-action="pe-editsave" data-did="' + d.id + '" data-eid="' + pe.id + '">Save</button><button class="btn-mini cancel" data-action="pe-editcancel">Cancel</button></div></div>';
   }
-  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span><span class="plan-ex-name-txt">' + esc(pe.name) + '</span><span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn" data-action="pe-edit" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
+  return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span>' + exTitleHTML(pe) + '<span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn" data-action="pe-edit" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
   const collapsed = planCollapsed.has(d.id);
@@ -914,9 +926,12 @@ function pickerAdd() {
   if (!name) { const el = document.querySelector(".picker-custom-name"); if (el) el.focus(); return; }
   const sets = parseInt(pickerSetsStr, 10);
   if (!Number.isFinite(sets) || sets <= 0) { alert("Enter a whole number of sets."); return; }
+  let base, mods = [];
+  if (pickerMovement && !pickerMovement.custom) { base = pickerMovement.m; if (pickerVar) mods.push(pickerVar); if (pickerEquip && pickerEquip !== "Bodyweight") mods.push(pickerEquip); }
+  else base = name;
   let ex;
-  if (pickerFail) ex = { id: uid(), name: name, sets: sets, reps: 0, repMax: null, toFailure: true };
-  else { const rr = parseRepsPair(pickerRepLowStr, pickerRepHighStr); if (!rr) { alert("Enter whole-number reps."); return; } ex = { id: uid(), name: name, sets: sets, reps: rr.reps, repMax: rr.repMax, toFailure: false }; }
+  if (pickerFail) ex = { id: uid(), name: name, base: base, mods: mods, sets: sets, reps: 0, repMax: null, toFailure: true };
+  else { const rr = parseRepsPair(pickerRepLowStr, pickerRepHighStr); if (!rr) { alert("Enter whole-number reps."); return; } ex = { id: uid(), name: name, base: base, mods: mods, sets: sets, reps: rr.reps, repMax: rr.repMax, toFailure: false }; }
   d.exercises.push(ex);
   savePlan(); pickerMovement = null; renderPlan(); renderPicker();
 }
@@ -1032,6 +1047,7 @@ function savePlanEx(did, eid) {
   if (!Number.isFinite(sets) || sets <= 0) { alert("Enter a whole number of sets."); return; }
   if (peEditFail) { pe.toFailure = true; pe.reps = 0; pe.repMax = null; }
   else { const rr = parseRepsPair((document.querySelector(".pe-ed-replow") || {}).value, (document.querySelector(".pe-ed-rephigh") || {}).value); if (!rr) { alert("Enter whole-number reps."); return; } pe.toFailure = false; pe.reps = rr.reps; pe.repMax = rr.repMax; }
+  if (name !== pe.name) { pe.base = name; pe.mods = []; }
   pe.name = name; pe.sets = sets;
   editPlanId = null; savePlan(); renderPlan();
 }
@@ -1043,7 +1059,7 @@ function editorRowHTML(w, e) {
   const last = prev ? '<div class="ed-last">Last time: <b>' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + '</b> \u00b7 ' + fmtShort(prev.date) + '</div>' : '<div class="ed-last">First time \u2014 no previous data</div>';
   const failBtn = '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">This session</span><button type="button" class="failtoggle' + (e.toFailure ? " on" : "") + '" data-action="editor-fail" data-id="' + e.id + '">To failure</button></div>';
   const repsCell = e.toFailure ? '<div><div class="pick-lbl">Reps</div><div class="pick-failinline">failure</div></div>' : '<div><div class="pick-lbl">Reps</div><input type="text" class="num" data-eid="' + e.id + '" data-field="reps" inputmode="numeric" value="' + esc(repText(e)) + '"></div>';
-  return '<div class="ed-card"><div class="ed-name-row"><span class="ed-nm">' + esc(e.name) + '</span><button class="icon-btn danger" data-action="editor-del" data-id="' + e.id + '" aria-label="Remove">' + SVG.trash + '</button></div>' + last + failBtn +
+  return '<div class="ed-card"><div class="ed-name-row">' + exTitleHTML(e) + '<button class="icon-btn danger" data-action="editor-del" data-id="' + e.id + '" aria-label="Remove">' + SVG.trash + '</button></div>' + last + failBtn +
     '<div class="pick-srgrid"><div><div class="pick-lbl">Weight (' + e.unit + ')</div><input type="text" class="num" data-eid="' + e.id + '" data-field="weight" inputmode="decimal" value="' + (e.weight == null ? "" : e.weight) + '" placeholder="\u2014"></div>' + repsCell +
     '<div><div class="pick-lbl">Sets</div><input type="text" class="num" data-eid="' + e.id + '" data-field="sets" inputmode="numeric" value="' + e.sets + '"></div></div></div>';
 }
@@ -1138,7 +1154,7 @@ function logWorkoutFromPlan(did) {
   d.exercises.forEach((pe, i) => {
     const id = uid();
     if (pe.kind === "cardio") { w.entries.push({ id: id, kind: "cardio", name: pe.name, minutes: pe.minutes || 0, distance: pe.distance || null, distUnit: pe.distUnit || "mi", calories: null, hr: null, ts: Date.now() + i }); }
-    else { const prev = lastEntryFor(pe.name, todayISO()); w.entries.push({ id: id, name: pe.name, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, toFailure: !!pe.toFailure, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); ids.push(id); }
+    else { const prev = lastEntryFor(pe.name, todayISO()); w.entries.push({ id: id, name: pe.name, base: pe.base, mods: pe.mods, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, toFailure: !!pe.toFailure, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); ids.push(id); }
   });
   save();
   flowWid = w.id; flowIds = ids; flowIdx = 0;
@@ -1159,7 +1175,7 @@ function renderFlow() {
   const nextLabel = i < n - 1 ? "Next \u2192" : "Done";
   const backBtn = i > 0 ? '<button class="icon-btn" data-action="flow-back" aria-label="Back">' + SVG.caretL + '</button>' : '<span style="width:34px"></span>';
   const inner = '<div class="pick-head">' + backBtn + '<div class="pick-title">Exercise ' + (i + 1) + ' of ' + n + '</div><button class="icon-btn" data-action="flow-close" aria-label="Close">' + SVG.close + '</button></div>' +
-    '<div class="flow-name">' + esc(e.name) + '</div><div class="flow-target">Target \u00b7 ' + target + '</div>' + lastRef +
+    '<div class="flow-name">' + esc(exBase(e)) + '</div>' + (exMods(e).length ? '<div class="ex-mods" style="margin-top:6px;">' + exMods(e).map(m => '<span class="ex-mod">' + esc(m) + '</span>').join("") + '</div>' : "") + '<div class="flow-target">Target \u00b7 ' + target + '</div>' + lastRef +
     '<div class="flow-inputs"><div><div class="pick-lbl">Weight</div><input type="text" class="num flow-weight" inputmode="decimal" value="' + esc(flowWeightStr) + '" placeholder="\u2014"></div><div><div class="pick-lbl">Reps</div>' + repsField + '</div></div>' +
     '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">Unit</span>' + units + '</div>' +
     '<button class="btn-primary" data-action="flow-next">' + nextLabel + '</button>';
