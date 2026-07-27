@@ -199,7 +199,10 @@
   #version { position: fixed; left: 10px; bottom: calc(72px + env(safe-area-inset-bottom)); font-size: 10px; font-weight: 600; color: var(--dim); background: rgba(255,255,255,0.72); border: 1px solid var(--line); padding: 2px 7px; border-radius: 999px; z-index: 40; pointer-events: none; font-variant-numeric: tabular-nums; }
 
   /* exercise picker */
-  #picker, #editor, #cardio, #logflow, #foodsheet { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  #picker, #editor, #cardio, #logflow, #foodsheet, #authsheet { display: none; position: fixed; inset: 0; background: rgba(20,20,25,0.45); z-index: 100; align-items: flex-end; justify-content: center; }
+  .sync-row { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+  .sync-row #sync-status b { color: var(--text); font-weight: 600; }
+  .auth-msg { margin-top: 12px; font-size: 13px; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 8px; padding: 9px 11px; }
   .pick-panel { background: var(--surface); width: 100%; max-width: 540px; border-radius: 20px 20px 0 0; padding: 18px 18px calc(20px + env(safe-area-inset-bottom)); max-height: 86vh; overflow-y: auto; box-shadow: 0 -8px 30px rgba(0,0,0,0.18); }
   .pick-head { display: flex; align-items: center; gap: 8px; margin-bottom: 16px; }
   .pick-title { flex: 1; font-size: 17px; font-weight: 700; color: var(--text); text-align: center; }
@@ -374,6 +377,7 @@
     </section>
 
     <footer>
+      <div class="sync-row"><span id="sync-status">Not syncing — data is on this device</span><button class="link-btn" id="sync-btn">Sign in to sync</button></div>
       <div class="footnote">Data lives <b id="storage-note">on this device</b>.</div>
       <div class="foot-actions">
         <button class="btn-ghost" id="export-btn">Export</button>
@@ -396,8 +400,10 @@
   <div id="cardio"></div>
   <div id="logflow"></div>
   <div id="foodsheet"></div>
-  <div id="version">v2.1</div>
+  <div id="authsheet"></div>
+  <div id="version">v2.2</div>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
 "use strict";
 
@@ -605,16 +611,27 @@ let pickerFail = false, peEditFail = false, addFail = false;
 let cardioOpen = false, cardioEditId = null, cardioAct = "Cycling", cardioMinStr = "", cardioDistStr = "", cardioUnit = "mi", cardioCalStr = "", cardioHrStr = "";
 let food = Store.load(K_FOOD) || { goalCal: null, days: {} };
 if (!food || typeof food !== "object" || !food.days) food = { goalCal: null, days: {} };
-const saveFood = () => Store.save(K_FOOD, food);
+const saveFood = () => { Store.save(K_FOOD, food); touchLocal(); };
 let foodOpen = false, foodMode = "list", foodCat = "Protein", foodSelCat = "", foodSelIdx = -1, foodQtyStr = "1", fcName = "", fcCal = "", fcP = "", fcC = "", fcF = "";
 const planCollapsed = new Set();
 let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
-const save = () => Store.save(K_WORKOUTS, workouts);
-const saveBody = () => Store.save(K_BODY, body);
-const savePlan = () => Store.save(K_PLAN, plan);
+/* ---- cloud sync state (Supabase) ---- */
+const SB_URL = "https://ldrplvaglbtkpwamrhjp.supabase.co";
+const SB_KEY = "sb_publishable_c-R81iKskjMahzeKaP_1NQ_iOMygwaa";
+const K_TS = "ironlog.ts", K_SYNCED = "ironlog.synced";
+let sb = null, session = null, cloudTimer = null;
+let localTS = Number(Store.load(K_TS)) || 0;
+let syncedOnce = !!Store.load(K_SYNCED);
+let authOpen = false, authEmail = "", authPw = "", authMsg = "";
+function touchLocal() { localTS = Date.now(); try { Store.save(K_TS, localTS); } catch (e) {} if (sb && session) cloudMark(); }
+function cloudMark() { if (cloudTimer) clearTimeout(cloudTimer); cloudTimer = setTimeout(function () { cloudTimer = null; pushCloud(); }, 1500); }
+
+const save = () => { Store.save(K_WORKOUTS, workouts); touchLocal(); };
+const saveBody = () => { Store.save(K_BODY, body); touchLocal(); };
+const savePlan = () => { Store.save(K_PLAN, plan); touchLocal(); };
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -1461,6 +1478,110 @@ function onFoodInput(e) {
 }
 function onFoodChange(e) { if (e.target.classList.contains("food-qty")) renderFoodSheet(); }
 
+/* ---- Supabase cloud sync ---- */
+function localHasData() { return workouts.length > 0 || plan.days.length > 0 || (body.weights && body.weights.length > 0) || Object.keys(food.days || {}).some(function (d) { return (food.days[d] || []).length > 0; }); }
+async function pushCloud() {
+  if (!sb || !session) return;
+  try { await sb.from("app_data").upsert({ user_id: session.user.id, payload: { workouts: workouts, body: body, plan: plan, food: food }, updated_at: new Date(localTS || Date.now()).toISOString() }, { onConflict: "user_id" }); } catch (e) {}
+}
+function applyCloud(p) {
+  if (!p) return;
+  if (cloudTimer) { clearTimeout(cloudTimer); cloudTimer = null; }
+  if (Array.isArray(p.workouts)) workouts = p.workouts;
+  if (p.body) { body = Object.assign({ heightCm: null, heightUnit: "ft", weightUnit: "lb", goal: "build", weights: [] }, p.body); if (!Array.isArray(body.weights)) body.weights = []; }
+  if (p.plan && Array.isArray(p.plan.days)) plan = p.plan;
+  if (p.food && p.food.days) food = p.food;
+  Store.save(K_WORKOUTS, workouts); Store.save(K_BODY, body); Store.save(K_PLAN, plan); Store.save(K_FOOD, food);
+  const tw = todayWorkout(); if (tw) expandedSet.add(tw.id);
+  renderAll();
+}
+function markSynced() { syncedOnce = true; try { Store.save(K_SYNCED, 1); } catch (e) {} }
+let reconciling = false;
+async function syncReconcile() {
+  if (!sb || !session || reconciling) return;
+  reconciling = true;
+  try {
+    const res = await sb.from("app_data").select("payload, updated_at").eq("user_id", session.user.id).maybeSingle();
+    if (res.error) { updateSyncUI(); return; }
+    const data = res.data;
+    if (!data) { await pushCloud(); markSynced(); updateSyncUI(); return; }
+    const cloudMs = Date.parse(data.updated_at) || 0;
+    if (!syncedOnce && localHasData() && cloudMs !== localTS) {
+      if (confirm("Your account already has saved data.\n\nOK = load your account's data onto this device.\nCancel = upload THIS device's data to your account instead.")) {
+        applyCloud(data.payload); localTS = cloudMs; try { Store.save(K_TS, localTS); } catch (e) {}
+      } else { localTS = Date.now(); try { Store.save(K_TS, localTS); } catch (e) {} await pushCloud(); }
+      markSynced(); updateSyncUI(); return;
+    }
+    if (cloudMs > localTS) { applyCloud(data.payload); localTS = cloudMs; try { Store.save(K_TS, localTS); } catch (e) {} }
+    else if (localTS > cloudMs) { await pushCloud(); }
+    markSynced(); updateSyncUI();
+  } catch (e) { updateSyncUI(); }
+  finally { reconciling = false; }
+}
+function updateSyncUI() {
+  const st = document.getElementById("sync-status"), btn = document.getElementById("sync-btn");
+  if (!st || !btn) return;
+  if (!sb) { st.textContent = "Sync unavailable (offline)"; btn.style.display = "none"; return; }
+  btn.style.display = "";
+  if (session) { st.innerHTML = 'Synced \u00b7 <b>' + esc(session.user.email || "signed in") + '</b>'; btn.textContent = "Sign out"; }
+  else { st.textContent = "Not syncing \u2014 data is on this device"; btn.textContent = "Sign in to sync"; }
+}
+function initSupabase() {
+  if (!window.supabase || !window.supabase.createClient) { updateSyncUI(); return; }
+  try { sb = window.supabase.createClient(SB_URL, SB_KEY); } catch (e) { sb = null; updateSyncUI(); return; }
+  sb.auth.getSession().then(function (r) { session = (r && r.data) ? r.data.session : null; onAuth(); });
+  sb.auth.onAuthStateChange(function (_ev, s) { session = s; onAuth(); });
+}
+function onAuth() { updateSyncUI(); if (session) syncReconcile(); }
+
+/* ---- auth sheet ---- */
+function openAuth() { authOpen = true; authMsg = ""; renderAuth(); }
+function renderAuth() {
+  const box = document.getElementById("authsheet");
+  if (!authOpen) { box.style.display = "none"; box.innerHTML = ""; return; }
+  box.style.display = "flex";
+  const inner = '<div class="pick-head"><span style="width:34px"></span><div class="pick-title">Sync account</div><button class="icon-btn" data-action="auth-close" aria-label="Close">' + SVG.close + '</button></div>' +
+    '<div class="start-sub" style="margin-bottom:14px;">Sign in with the same email on your phone and computer to keep them in sync.</div>' +
+    '<div class="pick-lbl">Email</div><input type="email" class="auth-email" value="' + esc(authEmail) + '" placeholder="you@example.com" autocomplete="username" style="margin-bottom:12px;">' +
+    '<div class="pick-lbl">Password</div><input type="password" class="auth-pw" value="' + esc(authPw) + '" placeholder="at least 6 characters" autocomplete="current-password">' +
+    (authMsg ? '<div class="auth-msg">' + esc(authMsg) + '</div>' : "") +
+    '<button class="btn-primary" data-action="auth-signin" style="margin-top:14px;">Sign in</button>' +
+    '<button class="btn-ghost wide" data-action="auth-signup" style="margin-top:8px;">Create account</button>';
+  box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
+}
+async function authSignIn() {
+  if (!sb) return;
+  if (!authEmail.trim() || !authPw) { authMsg = "Enter your email and password."; renderAuth(); return; }
+  authMsg = "Signing in\u2026"; renderAuth();
+  try { const r = await sb.auth.signInWithPassword({ email: authEmail.trim(), password: authPw }); if (r.error) { authMsg = r.error.message; renderAuth(); } else { authPw = ""; authOpen = false; renderAuth(); } }
+  catch (e) { authMsg = "Something went wrong. Check your connection."; renderAuth(); }
+}
+async function authSignUp() {
+  if (!sb) return;
+  if (!authEmail.trim() || authPw.length < 6) { authMsg = "Enter an email and a password of at least 6 characters."; renderAuth(); return; }
+  authMsg = "Creating account\u2026"; renderAuth();
+  try {
+    const r = await sb.auth.signUp({ email: authEmail.trim(), password: authPw });
+    if (r.error) { authMsg = r.error.message; renderAuth(); }
+    else if (r.data && r.data.session) { authPw = ""; authOpen = false; renderAuth(); }
+    else { authMsg = "Account created. Check your email for a confirmation link, then come back and Sign in."; renderAuth(); }
+  } catch (e) { authMsg = "Something went wrong. Check your connection."; renderAuth(); }
+}
+async function authSignOut() { if (sb) { try { await sb.auth.signOut(); } catch (e) {} } session = null; updateSyncUI(); }
+function onAuthClick(e) {
+  if (e.target.id === "authsheet") { authOpen = false; renderAuth(); return; }
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "auth-close") { authOpen = false; renderAuth(); }
+  else if (a === "auth-signin") authSignIn();
+  else if (a === "auth-signup") authSignUp();
+}
+function onAuthInput(e) {
+  const t = e.target;
+  if (t.classList.contains("auth-email")) authEmail = t.value;
+  else if (t.classList.contains("auth-pw")) authPw = t.value;
+}
+
 /* ---- wire ---- */
 $("add-form").addEventListener("submit", addEntry);
 $("ex-name").addEventListener("input", updateHint);
@@ -1506,7 +1627,14 @@ $("import-file").addEventListener("change", (e) => { if (e.target.files[0]) impo
 
 if (!Store.usable) { $("banner").style.display = "block"; $("storage-note").textContent = "in memory (preview only)"; }
 
+$("authsheet").addEventListener("click", onAuthClick);
+$("authsheet").addEventListener("input", onAuthInput);
+$("sync-btn").addEventListener("click", function () { if (session) authSignOut(); else openAuth(); });
+document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && sb && session) syncReconcile(); });
+
 setTab("log");
+updateSyncUI();
+initSupabase();
 </script>
 </body>
 </html>
