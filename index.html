@@ -328,6 +328,7 @@
           <button type="submit" class="btn-primary"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add to workout</button>
         </form>
         <button class="btn-ghost wide" id="add-cardio-btn" style="margin-top:10px;">+ Add cardio</button>
+        <button class="btn-primary" id="finish-workout-btn" style="margin-top:16px;">Finish workout</button>
       </section>
     </section>
 
@@ -406,7 +407,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.5</div>
+  <div id="version">v2.6</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -622,7 +623,7 @@ const planCollapsed = new Set();
 let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
 let flowCMinStr = "", flowCDistStr = "", flowCUnit = "mi", flowCCalStr = "", flowCHrStr = "";
 const expandedSet = new Set();
-(function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
+(function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } let ch = false; for (const w of workouts) { if (w.done === false && w.date < todayISO()) { w.done = true; ch = true; } } const act = workouts.find(w => w.done === false && w.date === todayISO()); if (act) expandedSet.add(act.id); if (ch) Store.save(K_WORKOUTS, workouts); })();
 
 /* ---- cloud sync state (Supabase) ---- */
 const SB_URL = "https://ldrplvaglbtkpwamrhjp.supabase.co";
@@ -658,7 +659,8 @@ function bmiCat(b) { if (b < 18.5) return "Underweight"; if (b < 25) return "Hea
 function goalLabel(g) { return g === "maintain" ? "Maintain" : g === "cut" ? "Lose fat" : "Build muscle"; }
 
 function todayWorkout() { const t = todayISO(); return workouts.find(w => w.date === t) || null; }
-function ensureTodayWorkout() { let w = todayWorkout(); if (!w) { w = { id: uid(), date: todayISO(), type: "", entries: [], ts: Date.now() }; workouts.push(w); } expandedSet.add(w.id); return w; }
+function activeWorkout() { const t = todayISO(); return workouts.find(w => w.done === false && w.date === t) || null; }
+function ensureTodayWorkout() { let w = activeWorkout(); if (!w) { w = { id: uid(), date: todayISO(), type: "", entries: [], done: false, ts: Date.now() }; workouts.push(w); } expandedSet.add(w.id); return w; }
 function findWorkout(id) { return workouts.find(w => w.id === id) || null; }
 function findEntryCtx(id) { for (const w of workouts) { const e = w.entries.find(x => x.id === id); if (e) return { w, e }; } return null; }
 function allEntries() { const out = []; for (const w of workouts) for (const e of w.entries) out.push(Object.assign({}, e, { date: w.date })); return out; }
@@ -860,17 +862,19 @@ function renderTop() {
   const names = [...new Set(allEntries().map(e => e.name))].sort();
   $("ex-list").innerHTML = names.map(n => '<option value="' + esc(n) + '">').join("");
   document.querySelectorAll("#unit-toggle button").forEach(b => b.classList.toggle("on", b.dataset.unit === exUnit));
-  $("add-form").style.display = todayWorkout() ? "block" : "none";
+  $("add-form").style.display = activeWorkout() ? "block" : "none";
 }
 function renderCards() {
-  const tw = todayWorkout();
-  $("today-workout").innerHTML = tw ? workoutCardHTML(tw) : "";
-  $("today-section").style.display = tw ? "block" : "none";
-  $("start-prompt").innerHTML = startPromptHTML(!!tw);
+  const w = activeWorkout();
+  $("today-workout").innerHTML = w ? workoutCardHTML(w) : "";
+  $("today-section").style.display = w ? "block" : "none";
+  $("start-section").style.display = w ? "none" : "block";
+  $("start-prompt").innerHTML = w ? "" : startPromptHTML(false);
 }
 function renderHistory() {
-  const all = workouts.slice().sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.ts || 0) - (a.ts || 0)));
-  $("history-content").innerHTML = all.length ? all.map(workoutCardHTML).join("") : '<div class="empty">No workouts logged yet. Log one from the Log tab and it\u2019ll show up here.</div>';
+  const act = activeWorkout();
+  const all = workouts.filter(w => w !== act).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.ts || 0) - (a.ts || 0)));
+  $("history-content").innerHTML = all.length ? all.map(workoutCardHTML).join("") : '<div class="empty">No workouts logged yet. Finish a workout and it\u2019ll show up here.</div>';
 }
 function renderBody() {
   const imp = body.heightUnit !== "cm";
@@ -1036,7 +1040,8 @@ function importData(file) {
       if (data && data.body) { body = Object.assign(body, data.body); if (!Array.isArray(body.weights)) body.weights = []; }
       if (data && data.plan && Array.isArray(data.plan.days)) plan = data.plan;
       if (data && data.food && typeof data.food === "object" && data.food.days) food = data.food;
-      const tw = todayWorkout(); if (tw) expandedSet.add(tw.id);
+      for (const w of workouts) { if (w.done === false && w.date < todayISO()) w.done = true; }
+      const tw = activeWorkout(); if (tw) expandedSet.add(tw.id);
       save(); saveBody(); savePlan(); saveFood(); renderAll();
     } catch (err) { alert("That file couldn't be read as an Onward backup."); }
   };
@@ -1346,7 +1351,9 @@ function loadFlowStep() {
 }
 function logWorkoutFromPlan(did) {
   const d = plan.days.find(x => x.id === did); if (!d) return;
-  const w = ensureTodayWorkout(); w.type = d.name;
+  const cur = activeWorkout(); if (cur) cur.done = true;
+  const w = { id: uid(), date: todayISO(), type: d.name, entries: [], done: false, ts: Date.now() };
+  workouts.push(w); expandedSet.add(w.id);
   const ids = [];
   d.exercises.forEach((pe, i) => {
     const id = uid();
@@ -1554,8 +1561,9 @@ function applyCloud(p) {
   if (p.body) { body = Object.assign({ heightCm: null, heightUnit: "ft", weightUnit: "lb", goal: "build", weights: [] }, p.body); if (!Array.isArray(body.weights)) body.weights = []; }
   if (p.plan && Array.isArray(p.plan.days)) plan = p.plan;
   if (p.food && p.food.days) food = p.food;
+  for (const w of workouts) { if (w.done === false && w.date < todayISO()) w.done = true; }
   Store.save(K_WORKOUTS, workouts); Store.save(K_BODY, body); Store.save(K_PLAN, plan); Store.save(K_FOOD, food);
-  const tw = todayWorkout(); if (tw) expandedSet.add(tw.id);
+  const tw = activeWorkout(); if (tw) expandedSet.add(tw.id);
   renderAll();
 }
 function markSynced() { syncedOnce = true; try { Store.save(K_SYNCED, 1); } catch (e) {} }
@@ -1667,6 +1675,7 @@ $("editor").addEventListener("input", onEditorInput);
 $("cardio").addEventListener("click", onCardioClick);
 $("cardio").addEventListener("input", onCardioInput);
 $("add-cardio-btn").addEventListener("click", () => openCardio(null));
+$("finish-workout-btn").addEventListener("click", function () { const w = activeWorkout(); if (!w) return; if (w.entries.length === 0) { if (!confirm("This workout is empty. Discard it?")) return; workouts = workouts.filter(x => x.id !== w.id); } else { w.done = true; } save(); renderAll(); window.scrollTo({ top: 0, behavior: "auto" }); });
 $("logflow").addEventListener("click", onFlowClick);
 $("logflow").addEventListener("input", onFlowInput);
 $("food-content").addEventListener("click", onFoodPageClick);
