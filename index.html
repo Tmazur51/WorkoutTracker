@@ -298,6 +298,10 @@
 
     <!-- ============ LOG ============ -->
     <section class="page" id="page-log">
+      <section class="section" id="start-section">
+        <div id="start-prompt"></div>
+      </section>
+
       <div class="stat-row">
         <div class="statcard"><div class="stat-tile blue"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9.5h18"/><path d="M8 3v3.5"/><path d="M16 3v3.5"/></svg></div><div class="stat-num" id="stat-week">0</div><div class="stat-cap">This week</div></div>
         <div class="statcard"><div class="stat-tile green"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg></div><div class="stat-num" id="stat-total">0</div><div class="stat-cap">Total</div></div>
@@ -324,10 +328,6 @@
           <button type="submit" class="btn-primary"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><path d="M12 5v14"/><path d="M5 12h14"/></svg> Add to workout</button>
         </form>
         <button class="btn-ghost wide" id="add-cardio-btn" style="margin-top:10px;">+ Add cardio</button>
-      </section>
-
-      <section class="section" id="start-section">
-        <div id="start-prompt"></div>
       </section>
     </section>
 
@@ -406,7 +406,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.3</div>
+  <div id="version">v2.4</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
