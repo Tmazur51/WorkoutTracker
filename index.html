@@ -406,7 +406,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.4</div>
+  <div id="version">v2.5</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -620,6 +620,7 @@ const saveFood = () => { Store.save(K_FOOD, food); touchLocal(); };
 let foodOpen = false, foodMode = "list", foodCat = "Protein", foodSelCat = "", foodSelIdx = -1, foodQtyStr = "1", fcName = "", fcCal = "", fcP = "", fcC = "", fcF = "";
 const planCollapsed = new Set();
 let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
+let flowCMinStr = "", flowCDistStr = "", flowCUnit = "mi", flowCCalStr = "", flowCHrStr = "";
 const expandedSet = new Set();
 (function () { for (const w of workouts) { if (w.entries[0]) { exUnit = w.entries[0].unit || "lb"; break; } } const tw = workouts.find(w => w.date === todayISO()); if (tw) expandedSet.add(tw.id); })();
 
@@ -669,6 +670,18 @@ function lastEntryFor(name, beforeDate) {
   const m = allEntries().filter(e => norm(e.name) === n && e.date < beforeDate);
   m.sort((a, b) => (a.date !== b.date ? (a.date < b.date ? 1 : -1) : (b.ts || 0) - (a.ts || 0)));
   return m[0] || null;
+}
+function lastEntryElsewhere(name, exclWid) {
+  const n = norm(name); let best = null;
+  for (const w of workouts) {
+    if (w.id === exclWid) continue;
+    for (const e of w.entries) {
+      if (e.kind === "cardio" || norm(e.name) !== n) continue;
+      const cand = Object.assign({}, e, { date: w.date });
+      if (!best || cand.date > best.date || (cand.date === best.date && (cand.ts || 0) > (best.ts || 0))) best = cand;
+    }
+  }
+  return best;
 }
 function computeDelta(cur, prev) {
   if (!prev) return null;
@@ -1317,7 +1330,20 @@ function onCardioInput(e) {
 
 /* ---- guided log flow (step through a workout, one exercise at a time) ---- */
 function flowEntry() { const w = findWorkout(flowWid); if (!w) return null; return w.entries.find(x => x.id === flowIds[flowIdx]) || null; }
-function loadFlowStep() { const e = flowEntry(); if (!e) return; flowWeightStr = e.weight == null ? "" : String(e.weight); flowRepsStr = e.toFailure ? "" : repText(e); flowUnit = e.unit || "lb"; }
+function loadFlowStep() {
+  const e = flowEntry(); if (!e) return;
+  if (e.kind === "cardio") {
+    flowCMinStr = e.minutes != null ? String(e.minutes) : "";
+    flowCDistStr = e.distance != null ? String(e.distance) : "";
+    flowCUnit = e.distUnit || "mi";
+    flowCCalStr = e.calories != null ? String(e.calories) : "";
+    flowCHrStr = e.hr != null ? String(e.hr) : "";
+  } else {
+    flowWeightStr = e.weight == null ? "" : String(e.weight);
+    flowRepsStr = e.toFailure ? "" : repText(e);
+    flowUnit = e.unit || "lb";
+  }
+}
 function logWorkoutFromPlan(did) {
   const d = plan.days.find(x => x.id === did); if (!d) return;
   const w = ensureTodayWorkout(); w.type = d.name;
@@ -1325,7 +1351,8 @@ function logWorkoutFromPlan(did) {
   d.exercises.forEach((pe, i) => {
     const id = uid();
     if (pe.kind === "cardio") { w.entries.push({ id: id, kind: "cardio", name: pe.name, minutes: pe.minutes || null, distance: pe.distance || null, distUnit: pe.distUnit || "mi", calories: null, hr: null, ts: Date.now() + i }); }
-    else { const prev = lastEntryFor(pe.name, todayISO()); w.entries.push({ id: id, name: pe.name, base: pe.base, mods: pe.mods, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, toFailure: !!pe.toFailure, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); ids.push(id); }
+    else { const prev = lastEntryElsewhere(pe.name, w.id); w.entries.push({ id: id, name: pe.name, base: pe.base, mods: pe.mods, weight: prev ? prev.weight : null, reps: pe.reps, repMax: pe.repMax || null, toFailure: !!pe.toFailure, sets: pe.sets, unit: prev ? prev.unit : exUnit, ts: Date.now() + i }); }
+    ids.push(id);
   });
   save();
   flowWid = w.id; flowIds = ids; flowIdx = 0;
@@ -1337,23 +1364,45 @@ function renderFlow() {
   const e = flowOpen ? flowEntry() : null;
   if (!e) { flowOpen = false; box.style.display = "none"; box.innerHTML = ""; return; }
   box.style.display = "flex";
-  const n = flowIds.length, i = flowIdx, w = findWorkout(flowWid);
-  const prev = lastEntryFor(e.name, w.date);
-  const lastRef = prev ? '<div class="flow-last">Last time: <b>' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + '</b></div>' : '<div class="flow-last">First time doing this</div>';
-  const target = e.toFailure ? (e.sets + " \u00d7 failure") : (e.sets + " \u00d7 " + repText(e));
-  const units = '<div class="seg"><button type="button" class="' + (flowUnit === "lb" ? "on" : "") + '" data-action="flow-unit" data-u="lb">lb</button><button type="button" class="' + (flowUnit === "kg" ? "on" : "") + '" data-action="flow-unit" data-u="kg">kg</button></div>';
-  const repsField = e.toFailure ? '<div class="pick-failinline">to failure</div>' : '<input type="text" class="num flow-reps" inputmode="numeric" value="' + esc(flowRepsStr) + '">';
+  const n = flowIds.length, i = flowIdx;
   const nextLabel = i < n - 1 ? "Next \u2192" : "Done";
   const backBtn = i > 0 ? '<button class="icon-btn" data-action="flow-back" aria-label="Back">' + SVG.caretL + '</button>' : '<span style="width:34px"></span>';
-  const inner = '<div class="pick-head">' + backBtn + '<div class="pick-title">Exercise ' + (i + 1) + ' of ' + n + '</div><button class="icon-btn" data-action="flow-close" aria-label="Close">' + SVG.close + '</button></div>' +
-    '<div class="flow-name">' + esc(exBase(e)) + '</div>' + (exMods(e).length ? '<div class="ex-mods" style="margin-top:6px;">' + exMods(e).map(m => '<span class="ex-mod">' + esc(m) + '</span>').join("") + '</div>' : "") + '<div class="flow-target">Target \u00b7 ' + target + '</div>' + lastRef +
-    '<div class="flow-inputs"><div><div class="pick-lbl">Weight</div><input type="text" class="num flow-weight" inputmode="decimal" value="' + esc(flowWeightStr) + '" placeholder="\u2014"></div><div><div class="pick-lbl">Reps</div>' + repsField + '</div></div>' +
-    '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">Unit</span>' + units + '</div>' +
-    '<button class="btn-primary" data-action="flow-next">' + nextLabel + '</button>';
+  const head = '<div class="pick-head">' + backBtn + '<div class="pick-title">Exercise ' + (i + 1) + ' of ' + n + '</div><button class="icon-btn" data-action="flow-close" aria-label="Close">' + SVG.close + '</button></div>';
+  const nameBlock = '<div class="flow-name">' + esc(exBase(e)) + '</div>' + (exMods(e).length ? '<div class="ex-mods" style="margin-top:6px;">' + exMods(e).map(m => '<span class="ex-mod">' + esc(m) + '</span>').join("") + '</div>' : "");
+  let body;
+  if (e.kind === "cardio") {
+    const cunits = ["mi", "km", "m"].map(u => '<button type="button" class="' + (flowCUnit === u ? "on" : "") + '" data-action="flow-cunit" data-u="' + u + '">' + u + '</button>').join("");
+    body = '<div class="flow-target">Log your cardio</div>' +
+      '<div class="cardio-grid" style="margin-top:14px;">' +
+        '<div><div class="pick-lbl">Duration (min)</div><input type="text" class="num flow-cmin" inputmode="numeric" value="' + esc(flowCMinStr) + '" placeholder="\u2014"></div>' +
+        '<div><div class="pick-lbl">Calories <span class="opt">(opt)</span></div><input type="text" class="num flow-ccal" inputmode="numeric" value="' + esc(flowCCalStr) + '" placeholder="\u2014"></div>' +
+        '<div><div class="pick-lbl">Distance <span class="opt">(opt)</span></div><input type="text" class="num flow-cdist" inputmode="decimal" value="' + esc(flowCDistStr) + '" placeholder="\u2014"></div>' +
+        '<div><div class="pick-lbl">Avg HR <span class="opt">(opt)</span></div><input type="text" class="num flow-chr" inputmode="numeric" value="' + esc(flowCHrStr) + '" placeholder="\u2014"></div>' +
+      '</div>' +
+      '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">Distance unit</span><div class="seg">' + cunits + '</div></div>';
+  } else {
+    const prev = lastEntryElsewhere(e.name, flowWid);
+    const lastRef = prev ? '<div class="flow-last">Last time: <b>' + (prev.weight == null ? "\u2014" : prev.weight + " " + prev.unit) + " \u00d7 " + repText(prev) + '</b> \u00b7 ' + fmtShort(prev.date) + '</div>' : '<div class="flow-last">First time doing this</div>';
+    const target = e.toFailure ? (e.sets + " \u00d7 failure") : (e.sets + " \u00d7 " + repText(e));
+    const units = '<div class="seg"><button type="button" class="' + (flowUnit === "lb" ? "on" : "") + '" data-action="flow-unit" data-u="lb">lb</button><button type="button" class="' + (flowUnit === "kg" ? "on" : "") + '" data-action="flow-unit" data-u="kg">kg</button></div>';
+    const repsField = e.toFailure ? '<div class="pick-failinline">to failure</div>' : '<input type="text" class="num flow-reps" inputmode="numeric" value="' + esc(flowRepsStr) + '">';
+    body = '<div class="flow-target">Target \u00b7 ' + target + '</div>' + lastRef +
+      '<div class="flow-inputs"><div><div class="pick-lbl">Weight</div><input type="text" class="num flow-weight" inputmode="decimal" value="' + esc(flowWeightStr) + '" placeholder="\u2014"></div><div><div class="pick-lbl">Reps</div>' + repsField + '</div></div>' +
+      '<div class="pick-subrow" style="margin-top:2px;"><span class="pick-sub">Unit</span>' + units + '</div>';
+  }
+  const inner = head + nameBlock + body + '<button class="btn-primary" data-action="flow-next">' + nextLabel + '</button>';
   box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
 }
 function flowApply() {
   const e = flowEntry(); if (!e) return;
+  if (e.kind === "cardio") {
+    const min = flowCMinStr.trim() === "" ? null : (Number.isFinite(parseInt(flowCMinStr, 10)) && parseInt(flowCMinStr, 10) > 0 ? parseInt(flowCMinStr, 10) : null);
+    const dist = flowCDistStr.trim() === "" ? null : (Number.isFinite(parseFloat(flowCDistStr)) && parseFloat(flowCDistStr) > 0 ? parseFloat(flowCDistStr) : null);
+    const cal = flowCCalStr.trim() === "" ? null : (Number.isFinite(parseInt(flowCCalStr, 10)) && parseInt(flowCCalStr, 10) >= 0 ? parseInt(flowCCalStr, 10) : null);
+    const hr = flowCHrStr.trim() === "" ? null : (Number.isFinite(parseInt(flowCHrStr, 10)) && parseInt(flowCHrStr, 10) > 0 ? parseInt(flowCHrStr, 10) : null);
+    e.minutes = min; e.distance = dist; e.distUnit = flowCUnit; e.calories = cal; e.hr = hr;
+    return;
+  }
   const wv = flowWeightStr.trim();
   if (wv === "") e.weight = null; else { const f = parseFloat(wv); if (Number.isFinite(f) && f >= 0) e.weight = f; }
   e.unit = flowUnit;
@@ -1370,11 +1419,16 @@ function onFlowClick(e) {
   else if (a === "flow-back") flowBack();
   else if (a === "flow-close") flowClose();
   else if (a === "flow-unit") { flowUnit = btn.dataset.u; renderFlow(); }
+  else if (a === "flow-cunit") { flowCUnit = btn.dataset.u; renderFlow(); }
 }
 function onFlowInput(e) {
   const t = e.target;
   if (t.classList.contains("flow-weight")) flowWeightStr = t.value;
   else if (t.classList.contains("flow-reps")) flowRepsStr = t.value;
+  else if (t.classList.contains("flow-cmin")) flowCMinStr = t.value;
+  else if (t.classList.contains("flow-cdist")) flowCDistStr = t.value;
+  else if (t.classList.contains("flow-ccal")) flowCCalStr = t.value;
+  else if (t.classList.contains("flow-chr")) flowCHrStr = t.value;
 }
 
 /* ---- food logging ---- */
