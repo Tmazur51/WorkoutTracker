@@ -257,6 +257,12 @@
   .food-detail-serv { font-size: 13px; color: var(--muted); }
   .food-preview { font-size: 14px; color: var(--muted); margin: 16px 0; font-variant-numeric: tabular-nums; }
   .food-preview b { color: var(--text); font-weight: 700; }
+  .week-card { padding-top: 16px; padding-bottom: 10px; }
+  .week-title { font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); font-weight: 700; margin-bottom: 8px; }
+  .week-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .week-row:first-of-type { border-top: 0; }
+  .week-dow { font-size: 14px; font-weight: 700; color: var(--text); width: 42px; flex-shrink: 0; }
+  .week-sel { flex: 1; max-width: 220px; min-height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); color: var(--text); font-family: var(--font-ui); font-size: 14px; font-weight: 600; padding: 6px 10px; }
   .pd-caret { transition: transform 0.15s ease; }
   .pd-caret.open { transform: rotate(180deg); }
   .plan-collapsed-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -407,7 +413,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.6</div>
+  <div id="version">v2.7</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -417,6 +423,7 @@ const LB = 2.20462;
 const DAY_TYPES = ["Push", "Pull", "Legs", "Upper", "Lower", "Full body"];
 const CARDIO_ACTS = ["Running", "Cycling", "Stationary Bike", "Swimming", "Rowing", "Elliptical", "Walking", "Stair Climber", "Hiking"];
 const SPLITS = { "Push Pull Legs": ["Push", "Pull", "Legs"], "Upper / Lower": ["Upper", "Lower"], "Full Body": ["Full Body"], "Bro Split": ["Chest", "Back", "Shoulders", "Arms", "Legs"] };
+const DOW = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 const CATALOG = {
   Push: [
@@ -605,6 +612,7 @@ let body = Object.assign({ heightCm: null, heightUnit: "ft", weightUnit: "lb", g
 if (!Array.isArray(body.weights)) body.weights = [];
 
 let plan = Store.load(K_PLAN) || { splitName: "", days: [] };
+if (!Array.isArray(plan.schedule)) plan.schedule = [null, null, null, null, null, null, null];
 if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 
 let activeTab = "log";
@@ -838,15 +846,25 @@ function planDayHTML(d) {
   const total = d.exercises.length ? '<div class="wk-total">Total \u00b7 ' + volumeStr + '</div>' : "";
   return '<div class="wk-card">' + head + '<div class="plan-ex-list" data-did="' + d.id + '">' + rows + '</div>' + total + '<button class="btn-ghost wide" data-action="open-picker" data-did="' + d.id + '" style="margin-top:10px;">+ Add exercise</button></div>';
 }
+function weeklyPlanHTML() {
+  const rows = DOW.map(function (dn, i) {
+    const opts = '<option value=""' + (plan.schedule[i] ? "" : " selected") + '>Rest day</option>' +
+      plan.days.map(function (d) { return '<option value="' + d.id + '"' + (plan.schedule[i] === d.id ? " selected" : "") + '>' + esc(d.name) + '</option>'; }).join("");
+    return '<div class="week-row"><span class="week-dow">' + dn + '</span><select class="week-sel" data-dow="' + i + '">' + opts + '</select></div>';
+  }).join("");
+  return '<div class="card pad week-card"><div class="week-title">Your week</div>' + rows + '</div>';
+}
 function renderPlan() {
   const box = $("plan-content");
   if (plan.days.length === 0) {
-    box.innerHTML = '<div class="card pad"><div class="start-title">Build your workouts</div><div class="start-sub">Start from a split template to name your workouts, then fill each with exercises \u2014 or start from scratch.</div><div class="chips">' +
+    box.innerHTML = '<div class="card pad"><div class="start-title">Create a split</div><div class="start-sub">Pick a template to scaffold a sample week, then choose which workout you do each day and fill each with exercises \u2014 or start from scratch.</div><div class="chips">' +
       Object.keys(SPLITS).map(n => '<button class="chip-btn" data-action="split-preset" data-split="' + esc(n) + '">' + esc(n) + '</button>').join("") +
       '</div><button class="btn-ghost wide" data-action="add-day" style="margin-top:14px;">Start from scratch</button></div>';
     return;
   }
-  box.innerHTML = '<div class="plan-topbar"><div class="plan-splitname">' + (plan.splitName ? esc(plan.splitName) : "My workouts") + '</div><button class="link-btn" data-action="reset-plan">Reset</button></div>' +
+  box.innerHTML = '<div class="plan-topbar"><div class="plan-splitname">' + (plan.splitName ? esc(plan.splitName) : "My split") + '</div><button class="link-btn" data-action="reset-plan">Reset</button></div>' +
+    weeklyPlanHTML() +
+    '<p class="eyebrow" style="margin-top:22px;">Your workouts</p>' +
     plan.days.map(planDayHTML).join("") +
     '<button class="btn-ghost wide" data-action="add-day">+ Add a workout</button>';
 }
@@ -876,6 +894,7 @@ function renderHistory() {
   const all = workouts.filter(w => w !== act).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.ts || 0) - (a.ts || 0)));
   $("history-content").innerHTML = all.length ? all.map(workoutCardHTML).join("") : '<div class="empty">No workouts logged yet. Finish a workout and it\u2019ll show up here.</div>';
 }
+function refreshCards() { renderCards(); renderHistory(); }
 function renderBody() {
   const imp = body.heightUnit !== "cm";
   $("ht-imperial").style.display = imp ? "flex" : "none";
@@ -963,8 +982,8 @@ function startFromPlan(did) {
 }
 function setType(wid, type) { const w = findWorkout(wid); if (!w) return; w.type = (type || "").trim(); openChooserId = null; save(); renderAll(); }
 function delWorkout(wid) { const w = findWorkout(wid); if (!w) return; if (!confirm("Delete this whole workout and its exercises?")) return; workouts = workouts.filter(x => x.id !== wid); editingId = null; openChooserId = null; expandedSet.delete(wid); save(); renderAll(); }
-function toggleExpand(wid) { if (expandedSet.has(wid)) { expandedSet.delete(wid); if (openChooserId === wid) openChooserId = null; } else expandedSet.add(wid); renderCards(); }
-function beginEdit(id) { const c = findEntryCtx(id); if (!c) return; editingId = id; editUnit = c.e.unit || "lb"; renderCards(); }
+function toggleExpand(wid) { if (expandedSet.has(wid)) { expandedSet.delete(wid); if (openChooserId === wid) openChooserId = null; } else expandedSet.add(wid); refreshCards(); }
+function beginEdit(id) { const c = findEntryCtx(id); if (!c) return; editingId = id; editUnit = c.e.unit || "lb"; refreshCards(); }
 function saveEdit(id) {
   const c = findEntryCtx(id); if (!c) return;
   const name = valOf(".ed-name"), wRaw = valOf(".ed-weight");
@@ -985,9 +1004,9 @@ function delEntry(id) {
 }
 
 /* ---- plan actions ---- */
-function applySplit(name) { plan = { splitName: name, days: (SPLITS[name] || []).map(n => ({ id: uid(), name: n, exercises: [] })) }; savePlan(); renderPlan(); }
+function applySplit(name) { const days = (SPLITS[name] || []).map(n => ({ id: uid(), name: n, exercises: [] })); const schedule = []; for (let i = 0; i < 7; i++) schedule[i] = (i < 6 && days.length) ? days[i % days.length].id : null; plan = { splitName: name, days: days, schedule: schedule }; savePlan(); renderPlan(); }
 function addDay() { if (!plan.splitName) plan.splitName = "My workouts"; plan.days.push({ id: uid(), name: "New workout", exercises: [] }); savePlan(); renderPlan(); const inputs = document.querySelectorAll(".plan-day-name"); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }
-function delDay(did) { const d = plan.days.find(x => x.id === did); if (!d) return; if (!confirm('Delete "' + d.name + '"?')) return; plan.days = plan.days.filter(x => x.id !== did); savePlan(); renderPlan(); }
+function delDay(did) { const d = plan.days.find(x => x.id === did); if (!d) return; if (!confirm('Delete "' + d.name + '"?')) return; plan.days = plan.days.filter(x => x.id !== did); if (Array.isArray(plan.schedule)) plan.schedule = plan.schedule.map(s => s === did ? null : s); savePlan(); renderPlan(); }
 function addPlanEx(did) {
   const d = plan.days.find(x => x.id === did); if (!d) return;
   const nameEl = document.querySelector('.plan-ex-name[data-did="' + did + '"]');
@@ -1002,7 +1021,7 @@ function addPlanEx(did) {
   const again = document.querySelector('.plan-ex-name[data-did="' + did + '"]'); if (again) again.focus();
 }
 function delPlanEx(did, eid) { const d = plan.days.find(x => x.id === did); if (!d) return; d.exercises = d.exercises.filter(x => x.id !== eid); savePlan(); renderPlan(); }
-function resetPlan() { if (!confirm("Clear your whole plan? Your logged workouts won't be affected.")) return; plan = { splitName: "", days: [] }; savePlan(); renderPlan(); }
+function resetPlan() { if (!confirm("Clear your whole plan? Your logged workouts won't be affected.")) return; plan = { splitName: "", days: [], schedule: [null, null, null, null, null, null, null] }; savePlan(); renderPlan(); }
 function renameDay(did, value) { const d = plan.days.find(x => x.id === did); if (!d) return; d.name = value.trim() || d.name; savePlan(); }
 
 /* ---- body / data actions ---- */
@@ -1056,17 +1075,17 @@ function onCardAction(e) {
   else if (a === "start-blank") startWorkout(valOf(".start-custom"));
   else if (a === "log-plan") logWorkoutFromPlan(did);
   else if (a === "pd-toggle") { if (planCollapsed.has(did)) planCollapsed.delete(did); else planCollapsed.add(did); renderPlan(); }
-  else if (a === "edit-type") { openChooserId = (openChooserId === wid ? null : wid); renderCards(); }
+  else if (a === "edit-type") { openChooserId = (openChooserId === wid ? null : wid); refreshCards(); }
   else if (a === "set-type") setType(wid, btn.dataset.type);
   else if (a === "set-type-custom") setType(wid, valOf(".type-custom"));
   else if (a === "clear-type") setType(wid, "");
   else if (a === "del-workout") delWorkout(wid);
   else if (a === "edit-ex") beginEdit(id);
   else if (a === "save-ex") saveEdit(id);
-  else if (a === "cancel-ex") { editingId = null; renderCards(); }
+  else if (a === "cancel-ex") { editingId = null; refreshCards(); }
   else if (a === "del-ex") delEntry(id);
   else if (a === "cardio-edit") openCardio(id);
-  else if (a === "ed-unit") { editUnit = btn.dataset.u; renderCards(); }
+  else if (a === "ed-unit") { editUnit = btn.dataset.u; refreshCards(); }
   else if (a === "split-preset") applySplit(btn.dataset.split);
   else if (a === "add-day") addDay();
   else if (a === "del-day") delDay(did);
@@ -1079,7 +1098,11 @@ function onCardAction(e) {
   else if (a === "edit-workout") openEditor(wid);
   else if (a === "reset-plan") resetPlan();
 }
-function onPlanChange(e) { const el = e.target.closest('[data-action="rename-day"]'); if (el) renameDay(el.dataset.did, el.value); }
+function onPlanChange(e) {
+  const sel = e.target.closest(".week-sel");
+  if (sel) { const i = +sel.dataset.dow; plan.schedule[i] = sel.value || null; savePlan(); return; }
+  const el = e.target.closest('[data-action="rename-day"]'); if (el) renameDay(el.dataset.did, el.value);
+}
 
 /* ---- exercise picker ---- */
 function openPicker(did) { const d = plan.days.find(x => x.id === did); pickerDay = did; pickerCat = dayCategory(d ? d.name : ""); pickerMovement = null; renderPicker(); }
