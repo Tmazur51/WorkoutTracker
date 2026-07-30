@@ -263,6 +263,12 @@
   .week-row:first-of-type { border-top: 0; }
   .week-dow { font-size: 14px; font-weight: 700; color: var(--text); width: 42px; flex-shrink: 0; }
   .week-sel { flex: 1; max-width: 220px; min-height: 40px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); color: var(--text); font-family: var(--font-ui); font-size: 14px; font-weight: 600; padding: 6px 10px; }
+  .split-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .split-row:first-of-type { border-top: 0; }
+  .split-name { flex: 1; min-width: 0; border: 0; background: transparent; font-family: var(--font-ui); font-size: 15px; font-weight: 700; color: var(--text); padding: 6px 2px; }
+  .split-name:focus { outline: none; border-bottom: 1px solid var(--ink); }
+  .split-active { font-size: 12px; font-weight: 700; color: var(--green); background: var(--green-bg, #e7f6ec); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+  .btn-mini.gray { background: var(--surface-2); color: var(--text); }
   .pd-caret { transition: transform 0.15s ease; }
   .pd-caret.open { transform: rotate(180deg); }
   .plan-collapsed-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -413,7 +419,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.7</div>
+  <div id="version">v2.8</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -611,8 +617,8 @@ if (!Array.isArray(workouts)) workouts = [];
 let body = Object.assign({ heightCm: null, heightUnit: "ft", weightUnit: "lb", goal: "build", weights: [] }, Store.load(K_BODY) || {});
 if (!Array.isArray(body.weights)) body.weights = [];
 
-let plan = Store.load(K_PLAN) || { splitName: "", days: [] };
-if (!Array.isArray(plan.schedule)) plan.schedule = [null, null, null, null, null, null, null];
+let plans = [], activePlanId = null, plan = { id: null, name: "", days: [], schedule: [null, null, null, null, null, null, null] };
+loadPlanStructure(Store.load(K_PLAN));
 if (!plan || !Array.isArray(plan.days)) plan = { splitName: "", days: [] };
 
 let activeTab = "log";
@@ -627,7 +633,7 @@ let food = Store.load(K_FOOD) || { goalCal: null, days: {} };
 if (!food || typeof food !== "object" || !food.days) food = { goalCal: null, days: {} };
 const saveFood = () => { Store.save(K_FOOD, food); touchLocal(); };
 let foodOpen = false, foodMode = "list", foodCat = "Protein", foodSelCat = "", foodSelIdx = -1, foodQtyStr = "1", fcName = "", fcCal = "", fcP = "", fcC = "", fcF = "";
-const planCollapsed = new Set();
+const planExpanded = new Set();
 let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
 let flowCMinStr = "", flowCDistStr = "", flowCUnit = "mi", flowCCalStr = "", flowCHrStr = "";
 const expandedSet = new Set();
@@ -646,7 +652,7 @@ function cloudMark() { if (cloudTimer) clearTimeout(cloudTimer); cloudTimer = se
 
 const save = () => { Store.save(K_WORKOUTS, workouts); touchLocal(); };
 const saveBody = () => { Store.save(K_BODY, body); touchLocal(); };
-const savePlan = () => { Store.save(K_PLAN, plan); touchLocal(); };
+const savePlan = () => { Store.save(K_PLAN, { plans: plans, activeId: activePlanId }); touchLocal(); };
 
 const $ = (id) => document.getElementById(id);
 const esc = (s) => String(s).replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -827,7 +833,7 @@ function planExHTML(d, pe) {
   return '<div class="plan-ex" data-eid="' + pe.id + '" data-did="' + d.id + '"><span class="drag-handle" data-handle aria-label="Drag to reorder">' + SVG.grip + '</span>' + exTitleHTML(pe) + '<span class="plan-ex-scheme">' + pe.sets + ' \u00d7 ' + repText(pe) + '</span><button class="icon-btn" data-action="pe-edit" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Edit">' + SVG.pencil + '</button><button class="icon-btn danger" data-action="del-plan-ex" data-did="' + d.id + '" data-eid="' + pe.id + '" aria-label="Remove">' + SVG.trash + '</button></div>';
 }
 function planDayHTML(d) {
-  const collapsed = planCollapsed.has(d.id);
+  const collapsed = !planExpanded.has(d.id);
   const rows = d.exercises.length ? d.exercises.map(pe => planExHTML(d, pe)).join("") : '<div class="empty small">No exercises yet.</div>';
   let rLow = 0, rHigh = 0, tSets = 0, cMin = 0;
   d.exercises.forEach(pe => { if (pe.kind === "cardio") { cMin += (pe.minutes || 0); return; } tSets += (pe.sets || 0); if (pe.toFailure) return; const hi = pe.repMax || pe.reps; rLow += (pe.sets || 0) * pe.reps; rHigh += (pe.sets || 0) * hi; });
@@ -854,19 +860,32 @@ function weeklyPlanHTML() {
   }).join("");
   return '<div class="card pad week-card"><div class="week-title">Your week</div>' + rows + '</div>';
 }
+function splitListHTML() {
+  const rows = plans.map(function (p) {
+    const isActive = p.id === activePlanId;
+    const right = isActive ? '<span class="split-active">Active</span>' : '<button class="btn-mini gray" data-action="activate-split" data-pid="' + p.id + '">Activate</button>';
+    return '<div class="split-row"><input type="text" class="split-name" data-action="rename-split" data-pid="' + p.id + '" value="' + esc(p.name) + '">' + right + '<button class="icon-btn danger" data-action="del-split" data-pid="' + p.id + '" aria-label="Delete split">' + SVG.trash + '</button></div>';
+  }).join("");
+  const presets = Object.keys(SPLITS).map(n => '<button class="chip-btn" data-action="split-preset" data-split="' + esc(n) + '">' + esc(n) + '</button>').join("") + '<button class="chip-btn" data-action="new-split">Empty</button>';
+  return '<div class="card pad"><div class="week-title">My splits</div>' + rows + '<div class="pick-lbl" style="margin-top:14px;">New split</div><div class="chips">' + presets + '</div></div>';
+}
 function renderPlan() {
   const box = $("plan-content");
-  if (plan.days.length === 0) {
-    box.innerHTML = '<div class="card pad"><div class="start-title">Create a split</div><div class="start-sub">Pick a template to scaffold a sample week, then choose which workout you do each day and fill each with exercises \u2014 or start from scratch.</div><div class="chips">' +
+  if (plans.length === 0) {
+    box.innerHTML = '<div class="card pad"><div class="start-title">Create a split</div><div class="start-sub">Pick a template to scaffold a sample week, or start from scratch. You can save more than one split and switch between them anytime.</div><div class="chips">' +
       Object.keys(SPLITS).map(n => '<button class="chip-btn" data-action="split-preset" data-split="' + esc(n) + '">' + esc(n) + '</button>').join("") +
-      '</div><button class="btn-ghost wide" data-action="add-day" style="margin-top:14px;">Start from scratch</button></div>';
+      '</div><button class="btn-ghost wide" data-action="new-split" style="margin-top:14px;">Start from scratch</button></div>';
     return;
   }
-  box.innerHTML = '<div class="plan-topbar"><div class="plan-splitname">' + (plan.splitName ? esc(plan.splitName) : "My split") + '</div><button class="link-btn" data-action="reset-plan">Reset</button></div>' +
-    weeklyPlanHTML() +
-    '<p class="eyebrow" style="margin-top:22px;">Your workouts</p>' +
-    plan.days.map(planDayHTML).join("") +
-    '<button class="btn-ghost wide" data-action="add-day">+ Add a workout</button>';
+  let html = splitListHTML();
+  const ap = activePlan();
+  if (ap) {
+    html += '<p class="eyebrow" style="margin-top:24px;">' + esc(ap.name) + ' \u2014 your week</p>' + weeklyPlanHTML();
+    html += '<p class="eyebrow" style="margin-top:22px;">Workouts</p>';
+    html += ap.days.length ? ap.days.map(planDayHTML).join("") : '<div class="empty small">No workouts in this split yet. Add one below, or start a new split from a template above.</div>';
+    html += '<button class="btn-ghost wide" data-action="add-day">+ Add a workout</button>';
+  }
+  box.innerHTML = html;
 }
 
 /* ---- render ---- */
@@ -1004,8 +1023,29 @@ function delEntry(id) {
 }
 
 /* ---- plan actions ---- */
-function applySplit(name) { const days = (SPLITS[name] || []).map(n => ({ id: uid(), name: n, exercises: [] })); const schedule = []; for (let i = 0; i < 7; i++) schedule[i] = (i < 6 && days.length) ? days[i % days.length].id : null; plan = { splitName: name, days: days, schedule: schedule }; savePlan(); renderPlan(); }
-function addDay() { if (!plan.splitName) plan.splitName = "My workouts"; plan.days.push({ id: uid(), name: "New workout", exercises: [] }); savePlan(); renderPlan(); const inputs = document.querySelectorAll(".plan-day-name"); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }
+function activePlan() { return plans.find(p => p.id === activePlanId) || null; }
+function loadPlanStructure(v) {
+  if (v && Array.isArray(v.plans)) { plans = v.plans; activePlanId = v.activeId; }
+  else if (v && Array.isArray(v.days)) { plans = [{ id: uid(), name: v.splitName || "My split", days: v.days, schedule: Array.isArray(v.schedule) ? v.schedule : [null, null, null, null, null, null, null] }]; activePlanId = plans[0].id; }
+  plans.forEach(p => { if (!Array.isArray(p.schedule)) p.schedule = [null, null, null, null, null, null, null]; });
+  if (!activePlanId && plans[0]) activePlanId = plans[0].id;
+  plan = activePlan() || { id: null, name: "", days: [], schedule: [null, null, null, null, null, null, null] };
+}
+function applySplit(name) {
+  const days = (SPLITS[name] || []).map(n => ({ id: uid(), name: n, exercises: [] }));
+  const schedule = []; for (let i = 0; i < 7; i++) schedule[i] = (i < 6 && days.length) ? days[i % days.length].id : null;
+  const p = { id: uid(), name: name, days: days, schedule: schedule };
+  plans.push(p); activePlanId = p.id; plan = p; savePlan(); renderAll();
+}
+function newSplit() {
+  const p = { id: uid(), name: "My split", days: [], schedule: [null, null, null, null, null, null, null] };
+  plans.push(p); activePlanId = p.id; plan = p; savePlan(); renderAll();
+  setTimeout(function () { const inputs = document.querySelectorAll(".split-name"); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }, 0);
+}
+function activateSplit(pid) { const p = plans.find(x => x.id === pid); if (!p) return; activePlanId = pid; plan = p; savePlan(); renderAll(); window.scrollTo({ top: 0, behavior: "auto" }); }
+function delSplit(pid) { const p = plans.find(x => x.id === pid); if (!p) return; if (!confirm('Delete the "' + p.name + '" split? Your logged workouts are not affected.')) return; plans = plans.filter(x => x.id !== pid); if (activePlanId === pid) activePlanId = plans[0] ? plans[0].id : null; plan = activePlan() || { id: null, name: "", days: [], schedule: [null, null, null, null, null, null, null] }; savePlan(); renderAll(); }
+function renameSplit(pid, value) { const p = plans.find(x => x.id === pid); if (p) { p.name = value.trim() || "Split"; savePlan(); } }
+function addDay() { if (!plan || !plan.id) return; plan.days.push({ id: uid(), name: "New workout", exercises: [] }); savePlan(); renderPlan(); const inputs = document.querySelectorAll(".plan-day-name"); const last = inputs[inputs.length - 1]; if (last) { last.focus(); last.select(); } }
 function delDay(did) { const d = plan.days.find(x => x.id === did); if (!d) return; if (!confirm('Delete "' + d.name + '"?')) return; plan.days = plan.days.filter(x => x.id !== did); if (Array.isArray(plan.schedule)) plan.schedule = plan.schedule.map(s => s === did ? null : s); savePlan(); renderPlan(); }
 function addPlanEx(did) {
   const d = plan.days.find(x => x.id === did); if (!d) return;
@@ -1039,7 +1079,7 @@ function saveHeight() {
   saveBody(); renderBody();
 }
 function exportData() {
-  const payload = { app: "onward", version: 5, workouts, body, plan, food };
+  const payload = { app: "onward", version: 6, workouts, body, plan: { plans: plans, activeId: activePlanId }, food };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob); const a = document.createElement("a");
   a.href = url; a.download = "onward-backup-" + todayISO() + ".json"; a.click(); URL.revokeObjectURL(url);
@@ -1057,7 +1097,7 @@ function importData(file) {
       if (!confirm("Replace current data with this backup?")) return;
       workouts = next;
       if (data && data.body) { body = Object.assign(body, data.body); if (!Array.isArray(body.weights)) body.weights = []; }
-      if (data && data.plan && Array.isArray(data.plan.days)) plan = data.plan;
+      if (data && data.plan) loadPlanStructure(data.plan);
       if (data && data.food && typeof data.food === "object" && data.food.days) food = data.food;
       for (const w of workouts) { if (w.done === false && w.date < todayISO()) w.done = true; }
       const tw = activeWorkout(); if (tw) expandedSet.add(tw.id);
@@ -1074,7 +1114,7 @@ function onCardAction(e) {
   else if (a === "start") startWorkout(btn.dataset.type);
   else if (a === "start-blank") startWorkout(valOf(".start-custom"));
   else if (a === "log-plan") logWorkoutFromPlan(did);
-  else if (a === "pd-toggle") { if (planCollapsed.has(did)) planCollapsed.delete(did); else planCollapsed.add(did); renderPlan(); }
+  else if (a === "pd-toggle") { if (planExpanded.has(did)) planExpanded.delete(did); else planExpanded.add(did); renderPlan(); }
   else if (a === "edit-type") { openChooserId = (openChooserId === wid ? null : wid); refreshCards(); }
   else if (a === "set-type") setType(wid, btn.dataset.type);
   else if (a === "set-type-custom") setType(wid, valOf(".type-custom"));
@@ -1087,6 +1127,9 @@ function onCardAction(e) {
   else if (a === "cardio-edit") openCardio(id);
   else if (a === "ed-unit") { editUnit = btn.dataset.u; refreshCards(); }
   else if (a === "split-preset") applySplit(btn.dataset.split);
+  else if (a === "new-split") newSplit();
+  else if (a === "activate-split") activateSplit(btn.dataset.pid);
+  else if (a === "del-split") delSplit(btn.dataset.pid);
   else if (a === "add-day") addDay();
   else if (a === "del-day") delDay(did);
   else if (a === "open-picker") openPicker(did);
@@ -1101,6 +1144,8 @@ function onCardAction(e) {
 function onPlanChange(e) {
   const sel = e.target.closest(".week-sel");
   if (sel) { const i = +sel.dataset.dow; plan.schedule[i] = sel.value || null; savePlan(); return; }
+  const sp = e.target.closest('[data-action="rename-split"]');
+  if (sp) { renameSplit(sp.dataset.pid, sp.value); return; }
   const el = e.target.closest('[data-action="rename-day"]'); if (el) renameDay(el.dataset.did, el.value);
 }
 
@@ -1575,14 +1620,14 @@ function onFoodChange(e) { if (e.target.classList.contains("food-qty")) renderFo
 function localHasData() { return workouts.length > 0 || plan.days.length > 0 || (body.weights && body.weights.length > 0) || Object.keys(food.days || {}).some(function (d) { return (food.days[d] || []).length > 0; }); }
 async function pushCloud() {
   if (!sb || !session) return;
-  try { await sb.from("app_data").upsert({ user_id: session.user.id, payload: { workouts: workouts, body: body, plan: plan, food: food }, updated_at: new Date(localTS || Date.now()).toISOString() }, { onConflict: "user_id" }); } catch (e) {}
+  try { await sb.from("app_data").upsert({ user_id: session.user.id, payload: { workouts: workouts, body: body, plan: { plans: plans, activeId: activePlanId }, food: food }, updated_at: new Date(localTS || Date.now()).toISOString() }, { onConflict: "user_id" }); } catch (e) {}
 }
 function applyCloud(p) {
   if (!p) return;
   if (cloudTimer) { clearTimeout(cloudTimer); cloudTimer = null; }
   if (Array.isArray(p.workouts)) workouts = p.workouts;
   if (p.body) { body = Object.assign({ heightCm: null, heightUnit: "ft", weightUnit: "lb", goal: "build", weights: [] }, p.body); if (!Array.isArray(body.weights)) body.weights = []; }
-  if (p.plan && Array.isArray(p.plan.days)) plan = p.plan;
+  if (p.plan) loadPlanStructure(p.plan);
   if (p.food && p.food.days) food = p.food;
   for (const w of workouts) { if (w.done === false && w.date < todayISO()) w.done = true; }
   Store.save(K_WORKOUTS, workouts); Store.save(K_BODY, body); Store.save(K_PLAN, plan); Store.save(K_FOOD, food);
