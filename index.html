@@ -269,6 +269,13 @@
   .split-name:focus { outline: none; border-bottom: 1px solid var(--ink); }
   .split-active { font-size: 12px; font-weight: 700; color: var(--green); background: var(--green-bg, #e7f6ec); padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
   .btn-mini.gray { background: var(--surface-2); color: var(--text); }
+  .pick-row-wrap { display: flex; align-items: center; gap: 6px; }
+  .ing-list { margin-bottom: 10px; }
+  .ing-row { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
+  .ing-name { flex: 1; min-width: 0; font-size: 14px; font-weight: 600; color: var(--text); }
+  .ing-cal { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .ing-add-row { display: flex; gap: 8px; margin-bottom: 14px; }
+  .ing-add-row .btn-ghost { flex: 1; }
   .pd-caret { transition: transform 0.15s ease; }
   .pd-caret.open { transform: rotate(180deg); }
   .plan-collapsed-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -419,7 +426,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.8</div>
+  <div id="version">v2.9</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -631,8 +638,12 @@ let pickerFail = false, peEditFail = false, addFail = false;
 let cardioOpen = false, cardioEditId = null, cardioAct = "Cycling", cardioMinStr = "", cardioDistStr = "", cardioUnit = "mi", cardioCalStr = "", cardioHrStr = "";
 let food = Store.load(K_FOOD) || { goalCal: null, days: {} };
 if (!food || typeof food !== "object" || !food.days) food = { goalCal: null, days: {} };
+if (!Array.isArray(food.custom)) food.custom = [];
 const saveFood = () => { Store.save(K_FOOD, food); touchLocal(); };
 let foodOpen = false, foodMode = "list", foodCat = "Protein", foodSelCat = "", foodSelIdx = -1, foodQtyStr = "1", fcName = "", fcCal = "", fcP = "", fcC = "", fcF = "";
+let foodPickTarget = "log";
+let recipeName = "", recipeIngredients = [], recipeServingsStr = "1";
+let riName = "", riCal = "", riP = "", riC = "", riF = "", riScoopsStr = "1";
 const planExpanded = new Set();
 let flowOpen = false, flowWid = null, flowIds = [], flowIdx = 0, flowWeightStr = "", flowRepsStr = "", flowUnit = "lb";
 let flowCMinStr = "", flowCDistStr = "", flowCUnit = "mi", flowCCalStr = "", flowCHrStr = "";
@@ -1511,7 +1522,8 @@ function round0(n) { return Math.round(n); }
 function todayFoods() { const t = todayISO(); if (!food.days[t]) food.days[t] = []; return food.days[t]; }
 function foodTotals(list) { let cal = 0, p = 0, c = 0, f = 0; list.forEach(x => { cal += x.cal || 0; p += x.p || 0; c += x.c || 0; f += x.f || 0; }); return { cal: cal, p: p, c: c, f: f }; }
 function proteinTarget() { const lw = latestWeightKg(); if (lw == null || lw <= 0) return null; const mult = ({ maintain: [1.4, 1.8], build: [1.6, 2.2], cut: [1.8, 2.4] })[body.goal] || [1.6, 2.2]; return { low: Math.round(lw * mult[0]), high: Math.round(lw * mult[1]) }; }
-function foodSelObj() { return (FOODS[foodSelCat] || [])[foodSelIdx] || null; }
+function foodSelObj() { const src = foodSelCat === "My foods" ? food.custom : (FOODS[foodSelCat] || []); return src[foodSelIdx] || null; }
+function recipeBatchTotals() { let cal = 0, p = 0, c = 0, f = 0; recipeIngredients.forEach(i => { cal += i.cal || 0; p += i.p || 0; c += i.c || 0; f += i.f || 0; }); return { cal: cal, p: p, c: c, f: f }; }
 
 function renderFood() {
   const list = todayFoods();
@@ -1547,28 +1559,39 @@ function onFoodPageClick(e) {
 function onFoodPageInput(e) { if (e.target.id === "food-goal") { const v = parseInt(e.target.value, 10); food.goalCal = (Number.isFinite(v) && v > 0) ? v : null; saveFood(); } }
 function onFoodPageChange(e) { if (e.target.id === "food-goal") renderFood(); }
 
-function openFoodSheet() { foodOpen = true; foodMode = "list"; foodCat = "Protein"; renderFoodSheet(); }
+function openFoodSheet() { foodOpen = true; foodMode = "list"; foodCat = "Protein"; foodPickTarget = "log"; renderFoodSheet(); }
 function renderFoodSheet() {
   const box = $("foodsheet");
   if (!foodOpen) { box.style.display = "none"; box.innerHTML = ""; return; }
   box.style.display = "flex";
   let inner = "";
   if (foodMode === "list") {
-    const catChips = FOOD_CATS.map(c => '<button class="chip-btn' + (foodCat === c ? " on" : "") + '" data-action="food-cat" data-c="' + esc(c) + '">' + esc(c) + '</button>').join("");
-    const items = (FOODS[foodCat] || []).map((it, idx) => '<button class="pick-item" data-action="food-pick" data-c="' + esc(foodCat) + '" data-idx="' + idx + '"><span class="food-item-name">' + esc(it.n) + '<span class="food-item-serv">' + esc(it.s) + '</span></span><span class="food-item-cal">' + it.cal + ' cal</span></button>').join("");
-    inner = '<div class="pick-head"><span style="width:34px"></span><div class="pick-title">Add food</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
-      '<div class="chips" style="margin-bottom:14px;">' + catChips + '</div>' +
-      '<div class="pick-list">' + items + '<button class="pick-item custom" data-action="food-custom"><span>Custom food\u2026</span>' + SVG.caretR + '</button></div>';
+    const toRecipe = foodPickTarget === "recipe";
+    const cats = ["My foods"].concat(FOOD_CATS);
+    const catChips = cats.map(c => '<button class="chip-btn' + (foodCat === c ? " on" : "") + '" data-action="food-cat" data-c="' + esc(c) + '">' + esc(c) + '</button>').join("");
+    let items;
+    if (foodCat === "My foods") {
+      items = food.custom.length ? food.custom.map((it, idx) => '<div class="pick-row-wrap"><button class="pick-item" style="flex:1" data-action="food-pick" data-c="My foods" data-idx="' + idx + '"><span class="food-item-name">' + esc(it.n) + '<span class="food-item-serv">' + esc(it.s) + '</span></span><span class="food-item-cal">' + it.cal + ' cal</span></button><button class="icon-btn danger" data-action="food-del-custom" data-idx="' + idx + '" aria-label="Delete">' + SVG.trash + '</button></div>').join("") : '<div class="empty small">No saved foods yet. Tap "Create a food" to build one.</div>';
+    } else {
+      items = (FOODS[foodCat] || []).map((it, idx) => '<button class="pick-item" data-action="food-pick" data-c="' + esc(foodCat) + '" data-idx="' + idx + '"><span class="food-item-name">' + esc(it.n) + '<span class="food-item-serv">' + esc(it.s) + '</span></span><span class="food-item-cal">' + it.cal + ' cal</span></button>');
+      items = items.join("") + '<button class="pick-item custom" data-action="food-custom"><span>One-off custom food\u2026</span>' + SVG.caretR + '</button>';
+    }
+    const left = toRecipe ? '<button class="icon-btn" data-action="food-back-recipe" aria-label="Back">' + SVG.caretL + '</button>' : '<span style="width:34px"></span>';
+    const createBtn = toRecipe ? "" : '<button class="btn-ghost wide" data-action="food-recipe" style="margin-bottom:14px;">+ Create a food</button>';
+    inner = '<div class="pick-head">' + left + '<div class="pick-title">' + (toRecipe ? "Add ingredient" : "Add food") + '</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<div class="chips" style="margin-bottom:14px;">' + catChips + '</div>' + createBtn +
+      '<div class="pick-list">' + items + '</div>';
   } else if (foodMode === "detail") {
     const it = foodSelObj();
     if (!it) { foodMode = "list"; renderFoodSheet(); return; }
     const q = parseFloat(foodQtyStr); const mult = Number.isFinite(q) && q > 0 ? q : 1;
+    const toRecipe = foodPickTarget === "recipe";
     inner = '<div class="pick-head"><button class="icon-btn" data-action="food-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">' + esc(it.n) + '</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
       '<div class="food-detail-serv">Per serving: ' + esc(it.s) + ' \u00b7 ' + it.cal + ' cal</div>' +
-      '<div class="pick-lbl" style="margin-top:16px;">Servings</div><input type="text" class="num food-qty" inputmode="decimal" value="' + esc(foodQtyStr) + '" style="max-width:140px">' +
+      '<div class="pick-lbl" style="margin-top:16px;">' + (toRecipe ? "Servings in the batch" : "Servings") + '</div><input type="text" class="num food-qty" inputmode="decimal" value="' + esc(foodQtyStr) + '" style="max-width:140px">' +
       '<div class="food-preview"><b>' + round0(it.cal * mult) + ' cal</b> \u00b7 ' + round0(it.p * mult) + 'g protein \u00b7 ' + round0(it.c * mult) + 'g carbs \u00b7 ' + round0(it.f * mult) + 'g fat</div>' +
-      '<button class="btn-primary" data-action="food-add">Add to today</button>';
-  } else {
+      '<button class="btn-primary" data-action="' + (toRecipe ? "food-add-ing" : "food-add") + '">' + (toRecipe ? "Add ingredient" : "Add to today") + '</button>';
+  } else if (foodMode === "custom") {
     inner = '<div class="pick-head"><button class="icon-btn" data-action="food-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">Custom food</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
       '<input type="text" class="fc-name" placeholder="Food name" value="' + esc(fcName) + '" style="margin-bottom:12px;">' +
       '<div class="cardio-grid"><div><div class="pick-lbl">Calories</div><input type="text" class="num fc-cal" inputmode="numeric" value="' + esc(fcCal) + '"></div>' +
@@ -1576,6 +1599,31 @@ function renderFoodSheet() {
       '<div><div class="pick-lbl">Carbs (g)</div><input type="text" class="num fc-c" inputmode="numeric" value="' + esc(fcC) + '"></div>' +
       '<div><div class="pick-lbl">Fat (g)</div><input type="text" class="num fc-f" inputmode="numeric" value="' + esc(fcF) + '"></div></div>' +
       '<button class="btn-primary" data-action="food-add-custom" style="margin-top:8px;">Add to today</button>';
+  } else if (foodMode === "recipe") {
+    const bt = recipeBatchTotals();
+    const sv = parseFloat(recipeServingsStr); const servings = Number.isFinite(sv) && sv > 0 ? sv : 1;
+    const ingRows = recipeIngredients.length ? recipeIngredients.map((ing, idx) => '<div class="ing-row"><span class="ing-name">' + esc(ing.name) + '</span><span class="ing-cal">' + round0(ing.cal) + ' cal</span><button class="icon-btn danger" data-action="recipe-del-ing" data-idx="' + idx + '" aria-label="Remove">' + SVG.trash + '</button></div>').join("") : '<div class="empty small">No ingredients yet. Add some below.</div>';
+    inner = '<div class="pick-head"><button class="icon-btn" data-action="food-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">Create a food</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<input type="text" class="rc-name" placeholder="Name (e.g. Protein cookies)" value="' + esc(recipeName) + '" style="margin-bottom:14px;">' +
+      '<div class="pick-lbl">Ingredients</div><div class="ing-list">' + ingRows + '</div>' +
+      '<div class="ing-add-row"><button class="btn-ghost" data-action="recipe-add-lib">+ From library</button><button class="btn-ghost" data-action="recipe-add-custom">+ Custom</button></div>' +
+      '<div class="food-preview">Batch total: <b>' + round0(bt.cal) + ' cal</b> \u00b7 ' + round0(bt.p) + 'g P \u00b7 ' + round0(bt.c) + 'g C \u00b7 ' + round0(bt.f) + 'g F</div>' +
+      '<div class="pick-lbl" style="margin-top:8px;">Servings this batch makes</div><input type="text" class="num rc-serv" inputmode="decimal" value="' + esc(recipeServingsStr) + '" style="max-width:140px">' +
+      '<div class="food-preview">Per serving: <b>' + round0(bt.cal / servings) + ' cal</b> \u00b7 ' + round0(bt.p / servings) + 'g P \u00b7 ' + round0(bt.c / servings) + 'g C \u00b7 ' + round0(bt.f / servings) + 'g F</div>' +
+      '<button class="btn-primary" data-action="recipe-save" style="margin-top:8px;">Save food</button>';
+  } else {
+    const sc = parseFloat(riScoopsStr); const scoops = Number.isFinite(sc) && sc > 0 ? sc : 1;
+    const per = (parseFloat(riCal) || 0);
+    inner = '<div class="pick-head"><button class="icon-btn" data-action="recipe-add-custom-back" aria-label="Back">' + SVG.caretL + '</button><div class="pick-title">Custom ingredient</div><button class="icon-btn" data-action="food-close" aria-label="Close">' + SVG.close + '</button></div>' +
+      '<input type="text" class="ri-name" placeholder="Ingredient (e.g. Whey protein)" value="' + esc(riName) + '" style="margin-bottom:12px;">' +
+      '<div class="pick-lbl">Nutrition per scoop</div>' +
+      '<div class="cardio-grid" style="margin-top:6px;"><div><div class="pick-lbl">Calories</div><input type="text" class="num ri-cal" inputmode="numeric" value="' + esc(riCal) + '"></div>' +
+      '<div><div class="pick-lbl">Protein (g)</div><input type="text" class="num ri-p" inputmode="numeric" value="' + esc(riP) + '"></div>' +
+      '<div><div class="pick-lbl">Carbs (g)</div><input type="text" class="num ri-c" inputmode="numeric" value="' + esc(riC) + '"></div>' +
+      '<div><div class="pick-lbl">Fat (g)</div><input type="text" class="num ri-f" inputmode="numeric" value="' + esc(riF) + '"></div></div>' +
+      '<div class="pick-lbl" style="margin-top:10px;">How many scoops in the batch?</div><input type="text" class="num ri-scoops" inputmode="decimal" value="' + esc(riScoopsStr) + '" style="max-width:140px">' +
+      '<div class="food-preview">Adds <b>' + round0(per * scoops) + ' cal</b> \u00b7 ' + round0((parseFloat(riP) || 0) * scoops) + 'g P \u00b7 ' + round0((parseFloat(riC) || 0) * scoops) + 'g C \u00b7 ' + round0((parseFloat(riF) || 0) * scoops) + 'g F</div>' +
+      '<button class="btn-primary" data-action="recipe-add-custom-save" style="margin-top:8px;">Add ingredient</button>';
   }
   box.innerHTML = '<div class="pick-panel">' + inner + '</div>';
 }
@@ -1593,17 +1641,52 @@ function foodAddCustom() {
   todayFoods().push({ id: uid(), name: name, cal: cal, p: Number.isFinite(p) ? p : 0, c: Number.isFinite(c) ? c : 0, f: Number.isFinite(f) ? f : 0 });
   saveFood(); fcName = ""; fcCal = ""; fcP = ""; fcC = ""; fcF = ""; foodMode = "list"; renderFoodSheet(); renderFood();
 }
+function foodAddIngredient() {
+  const it = foodSelObj(); if (!it) return;
+  const q = parseFloat(foodQtyStr); const mult = Number.isFinite(q) && q > 0 ? q : 1;
+  const name = it.n + (mult !== 1 ? " \u00d7" + (Math.round(mult * 100) / 100) : "");
+  recipeIngredients.push({ name: name, cal: it.cal * mult, p: it.p * mult, c: it.c * mult, f: it.f * mult });
+  foodMode = "recipe"; renderFoodSheet();
+}
+function recipeAddCustomSave() {
+  const name = riName.trim(); if (!name) { alert("Name the ingredient."); return; }
+  const sc = parseFloat(riScoopsStr); const scoops = Number.isFinite(sc) && sc > 0 ? sc : 1;
+  const cal = (parseFloat(riCal) || 0) * scoops, p = (parseFloat(riP) || 0) * scoops, c = (parseFloat(riC) || 0) * scoops, f = (parseFloat(riF) || 0) * scoops;
+  recipeIngredients.push({ name: name + (scoops !== 1 ? " \u00d7" + (Math.round(scoops * 100) / 100) + " scoops" : ""), cal: cal, p: p, c: c, f: f });
+  riName = ""; riCal = ""; riP = ""; riC = ""; riF = ""; riScoopsStr = "1";
+  foodMode = "recipe"; renderFoodSheet();
+}
+function recipeSave() {
+  const name = recipeName.trim(); if (!name) { alert("Give your food a name."); return; }
+  if (!recipeIngredients.length) { alert("Add at least one ingredient."); return; }
+  const sv = parseFloat(recipeServingsStr); const servings = Number.isFinite(sv) && sv > 0 ? sv : 1;
+  const bt = recipeBatchTotals();
+  food.custom.push({ id: uid(), n: name, s: servings > 1 ? "1 of " + (Math.round(servings * 100) / 100) : "1 serving", cal: round0(bt.cal / servings), p: round0(bt.p / servings), c: round0(bt.c / servings), f: round0(bt.f / servings) });
+  saveFood();
+  recipeName = ""; recipeIngredients = []; recipeServingsStr = "1";
+  foodPickTarget = "log"; foodCat = "My foods"; foodMode = "list"; renderFoodSheet(); renderFood();
+}
 function onFoodClick(e) {
   if (e.target.id === "foodsheet") { foodOpen = false; renderFoodSheet(); return; }
   const btn = e.target.closest("[data-action]"); if (!btn) return;
   const a = btn.dataset.action;
-  if (a === "food-close") { foodOpen = false; renderFoodSheet(); }
+  if (a === "food-close") { foodOpen = false; foodPickTarget = "log"; renderFoodSheet(); }
   else if (a === "food-cat") { foodCat = btn.dataset.c; renderFoodSheet(); }
   else if (a === "food-pick") { foodSelCat = btn.dataset.c; foodSelIdx = +btn.dataset.idx; foodQtyStr = "1"; foodMode = "detail"; renderFoodSheet(); }
   else if (a === "food-custom") { foodMode = "custom"; renderFoodSheet(); }
-  else if (a === "food-back") { foodMode = "list"; renderFoodSheet(); }
+  else if (a === "food-back") { foodMode = foodPickTarget === "recipe" ? "list" : "list"; renderFoodSheet(); }
+  else if (a === "food-back-recipe") { foodMode = "recipe"; renderFoodSheet(); }
   else if (a === "food-add") foodAdd();
+  else if (a === "food-add-ing") foodAddIngredient();
   else if (a === "food-add-custom") foodAddCustom();
+  else if (a === "food-del-custom") { food.custom.splice(+btn.dataset.idx, 1); saveFood(); renderFoodSheet(); renderFood(); }
+  else if (a === "food-recipe") { recipeName = ""; recipeIngredients = []; recipeServingsStr = "1"; foodPickTarget = "log"; foodMode = "recipe"; renderFoodSheet(); }
+  else if (a === "recipe-add-lib") { foodPickTarget = "recipe"; foodCat = "Protein"; foodMode = "list"; renderFoodSheet(); }
+  else if (a === "recipe-add-custom") { riName = ""; riCal = ""; riP = ""; riC = ""; riF = ""; riScoopsStr = "1"; foodMode = "recipe-custom"; renderFoodSheet(); }
+  else if (a === "recipe-add-custom-back") { foodMode = "recipe"; renderFoodSheet(); }
+  else if (a === "recipe-add-custom-save") recipeAddCustomSave();
+  else if (a === "recipe-del-ing") { recipeIngredients.splice(+btn.dataset.idx, 1); renderFoodSheet(); }
+  else if (a === "recipe-save") recipeSave();
 }
 function onFoodInput(e) {
   const t = e.target;
@@ -1613,8 +1696,16 @@ function onFoodInput(e) {
   else if (t.classList.contains("fc-p")) fcP = t.value;
   else if (t.classList.contains("fc-c")) fcC = t.value;
   else if (t.classList.contains("fc-f")) fcF = t.value;
+  else if (t.classList.contains("rc-name")) recipeName = t.value;
+  else if (t.classList.contains("rc-serv")) recipeServingsStr = t.value;
+  else if (t.classList.contains("ri-name")) riName = t.value;
+  else if (t.classList.contains("ri-cal")) riCal = t.value;
+  else if (t.classList.contains("ri-p")) riP = t.value;
+  else if (t.classList.contains("ri-c")) riC = t.value;
+  else if (t.classList.contains("ri-f")) riF = t.value;
+  else if (t.classList.contains("ri-scoops")) riScoopsStr = t.value;
 }
-function onFoodChange(e) { if (e.target.classList.contains("food-qty")) renderFoodSheet(); }
+function onFoodChange(e) { const t = e.target; if (t.classList.contains("food-qty") || t.classList.contains("rc-serv") || t.classList.contains("ri-scoops") || t.classList.contains("ri-cal") || t.classList.contains("ri-p") || t.classList.contains("ri-c") || t.classList.contains("ri-f")) renderFoodSheet(); }
 
 /* ---- Supabase cloud sync ---- */
 function localHasData() { return workouts.length > 0 || plan.days.length > 0 || (body.weights && body.weights.length > 0) || Object.keys(food.days || {}).some(function (d) { return (food.days[d] || []).length > 0; }); }
