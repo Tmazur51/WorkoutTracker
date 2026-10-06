@@ -192,7 +192,7 @@
 
   /* bottom tab bar */
   .tabbar { position: fixed; left: 0; right: 0; bottom: 0; background: rgba(255,255,255,0.92); -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px); border-top: 1px solid var(--line); z-index: 50; }
-  .tabbar-inner { max-width: 540px; margin: 0 auto; display: flex; padding: 8px 4px calc(8px + env(safe-area-inset-bottom)); }
+  .tabbar-inner { max-width: 560px; margin: 0 auto; display: flex; padding: 8px 2px calc(8px + env(safe-area-inset-bottom)); }
   .tab { flex: 1; appearance: none; background: transparent; border: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 3px; color: var(--dim); font-family: var(--font-ui); font-size: 10px; font-weight: 600; letter-spacing: -0.01em; padding: 6px 0; border-radius: 10px; }
   .tab .ic { width: 22px; height: 22px; }
   .tab.on { color: var(--ink); }
@@ -276,6 +276,25 @@
   .ing-cal { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
   .ing-add-row { display: flex; gap: 8px; margin-bottom: 14px; }
   .ing-add-row .btn-ghost { flex: 1; }
+  .run-sub { font-size: 13px; color: var(--muted); margin-top: 8px; font-variant-numeric: tabular-nums; }
+  .run-form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .run-form-grid input.num { width: 100%; min-height: 46px; }
+  .rw-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; border-top: 1px solid var(--line); }
+  .rw-row:first-child { border-top: 0; }
+  .rw-label { font-size: 13px; font-weight: 600; color: var(--text); width: 92px; flex-shrink: 0; }
+  .rw-bar { flex: 1; height: 7px; background: var(--surface-2); border-radius: 999px; overflow: hidden; }
+  .rw-fill { height: 100%; background: var(--ink); border-radius: 999px; }
+  .rw-fill.good { background: var(--green); }
+  .rw-val { font-size: 12.5px; color: var(--muted); font-variant-numeric: tabular-nums; width: 56px; text-align: right; flex-shrink: 0; }
+  .race-banner { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+  .race-title { font-size: 16px; font-weight: 800; color: var(--text); letter-spacing: -0.01em; }
+  .race-sub { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .date-in { width: 100%; max-width: 220px; min-height: 44px; border: 1px solid var(--line-2); border-radius: 10px; background: var(--surface); color: var(--text); font-family: var(--font-ui); font-size: 15px; font-weight: 600; padding: 8px 10px; }
+  .rw-row.plan .rw-label { flex: 1; width: auto; }
+  .rw-goal { width: 72px; min-height: 38px; border: 1px solid var(--line-2); border-radius: 9px; background: var(--surface); color: var(--text); font-family: var(--font-ui); font-size: 14px; font-weight: 700; text-align: center; padding: 4px; flex-shrink: 0; }
+  .rw-mi { font-size: 12px; color: var(--muted); flex-shrink: 0; }
+  .rw-race { font-size: 13px; font-weight: 700; color: var(--orange); flex-shrink: 0; }
+  .run-note-sm { font-size: 12px; color: var(--dim); margin-top: 8px; }
   .pd-caret { transition: transform 0.15s ease; }
   .pd-caret.open { transform: rotate(180deg); }
   .plan-collapsed-sum { font-size: 13px; color: var(--muted); font-variant-numeric: tabular-nums; }
@@ -400,6 +419,11 @@
       <div id="history-content"></div>
     </section>
 
+    <section class="page" id="page-run">
+      <p class="eyebrow">Run</p>
+      <div id="run-content"></div>
+    </section>
+
     <footer>
       <div class="sync-row"><span id="sync-status">Not syncing — data is on this device</span><button class="link-btn" id="sync-btn">Sign in to sync</button></div>
       <div class="footnote">Data lives <b id="storage-note">on this device</b>.</div>
@@ -418,6 +442,7 @@
     <button class="tab" data-tab="progress"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11"/><path d="M12 20V4"/><path d="M19 20v-6"/></svg><span>Progress</span></button>
     <button class="tab" data-tab="body"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg><span>Body</span></button>
     <button class="tab" data-tab="food"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v18"/><path d="M6 3v5a2 2 0 004 0V3"/><path d="M16 21V3c-2 0-3 2-3 5s1 4 3 4"/></svg><span>Food</span></button>
+    <button class="tab" data-tab="run"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="5" r="1.8"/><path d="M4 21l3.5-5 2.5-2-1-5"/><path d="M9 9l4.5 1.5 2.5-2.5"/><path d="M13.5 10.5l1 4 3.5 2.5"/><path d="M4.5 13.5l3-1.5"/></svg><span>Run</span></button>
   </div></nav>
 
   <div id="picker"></div>
@@ -426,7 +451,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v2.9</div>
+  <div id="version">v3.1</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -640,8 +665,14 @@ let food = Store.load(K_FOOD) || { goalCal: null, days: {} };
 if (!food || typeof food !== "object" || !food.days) food = { goalCal: null, days: {} };
 if (!Array.isArray(food.custom)) food.custom = [];
 const saveFood = () => { Store.save(K_FOOD, food); touchLocal(); };
+const K_RUN = "ironlog.run";
+let run = Store.load(K_RUN) || { goals: {}, runs: [] };
+if (!run || typeof run !== "object") run = { goals: {}, runs: [] };
+if (!run.goals) run.goals = {}; if (!Array.isArray(run.runs)) run.runs = [];
+const saveRun = () => { Store.save(K_RUN, run); touchLocal(); };
 let foodOpen = false, foodMode = "list", foodCat = "Protein", foodSelCat = "", foodSelIdx = -1, foodQtyStr = "1", fcName = "", fcCal = "", fcP = "", fcC = "", fcF = "";
 let foodPickTarget = "log";
+let raceEditOpen = false;
 let recipeName = "", recipeIngredients = [], recipeServingsStr = "1";
 let riName = "", riCal = "", riP = "", riC = "", riF = "", riScoopsStr = "1";
 const planExpanded = new Set();
@@ -962,13 +993,13 @@ function renderChart() {
   if (series.length > 1) { const diff = round1(last - series[0].value); if (diff !== 0) txt += "  \u00b7  " + (diff > 0 ? "+" : "\u2212") + Math.abs(diff) + " " + u + " since " + fmtShort(series[0].date); }
   latest.textContent = txt;
 }
-function renderAll() { renderStats(); renderTop(); renderCards(); renderHistory(); renderPlan(); renderBody(); renderChartSelect(); renderChart(); renderFood(); }
+function renderAll() { renderStats(); renderTop(); renderCards(); renderHistory(); renderPlan(); renderBody(); renderChartSelect(); renderChart(); renderFood(); renderRun(); }
 
 function setTab(t) {
   activeTab = t;
-  ["log", "history", "plan", "progress", "body", "food"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
+  ["log", "history", "plan", "progress", "body", "food", "run"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
   document.querySelectorAll(".tabbar .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  const subs = { log: "Track your training and progress", history: "Your logged workouts", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target", food: "Log meals against your targets" };
+  const subs = { log: "Track your training and progress", history: "Your logged workouts", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target", food: "Log meals against your targets", run: "Marathon training \u00b7 weekly miles" };
   $("brand-sub").textContent = subs[t] || "";
   renderAll();
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -1090,7 +1121,7 @@ function saveHeight() {
   saveBody(); renderBody();
 }
 function exportData() {
-  const payload = { app: "onward", version: 6, workouts, body, plan: { plans: plans, activeId: activePlanId }, food };
+  const payload = { app: "onward", version: 7, workouts, body, plan: { plans: plans, activeId: activePlanId }, food, run };
   const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob); const a = document.createElement("a");
   a.href = url; a.download = "onward-backup-" + todayISO() + ".json"; a.click(); URL.revokeObjectURL(url);
@@ -1110,9 +1141,10 @@ function importData(file) {
       if (data && data.body) { body = Object.assign(body, data.body); if (!Array.isArray(body.weights)) body.weights = []; }
       if (data && data.plan) loadPlanStructure(data.plan);
       if (data && data.food && typeof data.food === "object" && data.food.days) food = data.food;
+      if (data && data.run && typeof data.run === "object") { run = data.run; if (!run.goals) run.goals = {}; if (!Array.isArray(run.runs)) run.runs = []; }
       for (const w of workouts) { if (w.done === false && w.date < todayISO()) w.done = true; }
       const tw = activeWorkout(); if (tw) expandedSet.add(tw.id);
-      save(); saveBody(); savePlan(); saveFood(); renderAll();
+      save(); saveBody(); savePlan(); saveFood(); saveRun(); renderAll();
     } catch (err) { alert("That file couldn't be read as an Onward backup."); }
   };
   reader.readAsText(file);
@@ -1707,11 +1739,138 @@ function onFoodInput(e) {
 }
 function onFoodChange(e) { const t = e.target; if (t.classList.contains("food-qty") || t.classList.contains("rc-serv") || t.classList.contains("ri-scoops") || t.classList.contains("ri-cal") || t.classList.contains("ri-p") || t.classList.contains("ri-c") || t.classList.contains("ri-f")) renderFoodSheet(); }
 
+/* ---- running / marathon training ---- */
+function mondayISO(iso) { const d = new Date(iso + "T00:00:00"); const wd = (d.getDay() + 6) % 7; d.setDate(d.getDate() - wd); return d.toISOString().slice(0, 10); }
+function weekdayMon(iso) { const d = new Date(iso + "T00:00:00"); return (d.getDay() + 6) % 7; }
+function weekLabel(mon) { const a = new Date(mon + "T00:00:00"); const b = new Date(a); b.setDate(b.getDate() + 6); const f = dt => (dt.getMonth() + 1) + "/" + dt.getDate(); return f(a) + "\u2013" + f(b); }
+function runMilesInWeek(mon) { let s = 0; run.runs.forEach(r => { if (mondayISO(r.date) === mon) s += (r.miles || 0); }); return s; }
+function autoTargets() {
+  if (!run.raceDate) return null;
+  const thisMon = mondayISO(todayISO());
+  const raceMon = mondayISO(run.raceDate);
+  if (raceMon < thisMon) return null;
+  const weeks = []; let d = new Date(thisMon + "T00:00:00"); const end = new Date(raceMon + "T00:00:00");
+  while (d <= end) { weeks.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 7); }
+  const T = weeks.length;
+  const start = (run.startMiles && run.startMiles > 0) ? run.startMiles : 10;
+  const out = {};
+  if (T === 1) { out[weeks[0]] = { miles: 26, race: true }; return out; }
+  const buildCount = Math.max(1, T - 3);
+  let peak = start * Math.pow(1.1, buildCount);
+  peak = Math.min(peak, (run.peakMiles && run.peakMiles > 0) ? run.peakMiles : 45);
+  if (peak < start) peak = start;
+  for (let i = 0; i < T; i++) {
+    const w = weeks[i];
+    if (i === T - 1) out[w] = { miles: 26, race: true };
+    else if (i === T - 2) out[w] = { miles: Math.max(start, Math.round(peak * 0.5)) };
+    else if (i === T - 3) out[w] = { miles: Math.max(start, Math.round(peak * 0.7)) };
+    else { const frac = buildCount > 1 ? Math.min(1, i / (buildCount - 1)) : 1; out[w] = { miles: Math.round(start * Math.pow(peak / start, frac)) }; }
+  }
+  return out;
+}
+function effectiveGoal(mon) {
+  if (run.goals[mon] != null) return run.goals[mon];
+  const auto = autoTargets();
+  if (auto && auto[mon]) return auto[mon].miles;
+  let best = null; Object.keys(run.goals).forEach(k => { if (k <= mon && (best === null || k > best)) best = k; });
+  return best !== null ? run.goals[best] : ((run.startMiles && run.startMiles > 0) ? run.startMiles : 10);
+}
+function fmtRace(iso) { const MO = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"]; const d = new Date(iso + "T00:00:00"); return MO[d.getMonth()] + " " + d.getDate() + ", " + d.getFullYear(); }
+function paceStr(min, miles) { if (!min || !miles) return ""; const p = min / miles; const m = Math.floor(p); const s = Math.round((p - m) * 60); return m + ":" + (s < 10 ? "0" + s : s) + " /mi"; }
+function renderRun() {
+  const thisMon = mondayISO(todayISO());
+  const done = runMilesInWeek(thisMon);
+  const goal = effectiveGoal(thisMon);
+  const hasRace = !!run.raceDate && mondayISO(run.raceDate) >= thisMon;
+  let top;
+  if (!run.raceDate || raceEditOpen) {
+    const dv = run.raceDate || "";
+    const sv = (run.startMiles && run.startMiles > 0) ? String(run.startMiles) : "";
+    top = '<div class="card pad"><div class="start-title">' + (run.raceDate ? "Edit your race" : "Plan your marathon") + '</div><div class="start-sub">Set your race date and about how many miles you run this week. I\u2019ll build a weekly plan that ramps up then tapers \u2014 the weekly goal updates on its own as the weeks pass.</div>' +
+      '<div class="pick-lbl" style="margin-top:12px;">Marathon date</div><input type="date" class="date-in" id="race-date" value="' + esc(dv) + '">' +
+      '<div class="pick-lbl" style="margin-top:10px;">Miles this week (starting point)</div><input type="text" class="num" id="race-start" inputmode="decimal" value="' + esc(sv) + '" placeholder="10" style="max-width:140px">' +
+      '<button class="btn-primary" data-action="race-save" style="margin-top:14px;">' + (run.raceDate ? "Save" : "Build my plan") + '</button>' +
+      (run.raceDate ? '<button class="btn-ghost wide" data-action="race-cancel" style="margin-top:8px;">Cancel</button>' : "") + '</div>';
+  } else {
+    const raceMon = mondayISO(run.raceDate);
+    const wtg = Math.round((new Date(raceMon + "T00:00:00") - new Date(thisMon + "T00:00:00")) / (7 * 86400000));
+    const wtgTxt = wtg <= 0 ? "Race week \u2014 good luck!" : wtg + (wtg === 1 ? " week to go" : " weeks to go");
+    top = '<div class="card pad race-banner"><div><div class="race-title">\uD83C\uDFC1 ' + fmtRace(run.raceDate) + '</div><div class="race-sub">' + wtgTxt + '</div></div><button class="link-btn" data-action="race-edit">Edit</button></div>';
+  }
+  const pct = goal > 0 ? Math.min(100, Math.round(done / goal * 100)) : 0;
+  const remaining = Math.max(0, goal - done);
+  const daysLeft = 7 - weekdayMon(todayISO());
+  const metMsg = remaining <= 0 ? "Weekly goal hit \u2014 nice work." : (round1(remaining) + " mi to go \u00b7 " + daysLeft + (daysLeft === 1 ? " day" : " days") + " left");
+  const goalRow = hasRace ? '<div class="run-sub">Goal from your plan</div>' : '<div class="food-goalrow"><span class="pick-sub">Weekly goal (mi)</span><input type="text" class="num" id="run-goal" inputmode="decimal" value="' + goal + '"></div>';
+  const card = '<div class="card pad food-totals" style="margin-top:10px;"><div class="food-cal-big">' + round1(done) + '</div><div class="food-cal-sub">of ' + goal + ' mi this week</div>' +
+    '<div class="fbar"><div class="fbar-fill' + (done >= goal ? " good" : "") + '" style="width:' + pct + '%"></div></div>' +
+    '<div class="run-sub">' + metMsg + '</div>' + goalRow + '</div>';
+  const form = '<div class="card" style="padding:16px; margin-top:10px;"><div class="run-form-grid"><div><div class="pick-lbl">Distance (mi)</div><input type="text" class="num" id="run-dist" inputmode="decimal" placeholder="4"></div><div><div class="pick-lbl">Time (min) <span class="opt">(opt)</span></div><input type="text" class="num" id="run-min" inputmode="numeric" placeholder="\u2014"></div></div>' +
+    '<input type="text" id="run-note" placeholder="Note (optional, e.g. easy run)" style="margin-top:10px;">' +
+    '<button class="btn-primary" data-action="run-add" style="margin-top:10px;">Add run</button></div>';
+  const weekRuns = run.runs.filter(r => mondayISO(r.date) === thisMon).sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : (b.ts || 0) - (a.ts || 0)));
+  const runList = weekRuns.length ? weekRuns.map(r => {
+    const pc = paceStr(r.minutes, r.miles);
+    const meta = [fmtShort(r.date)]; if (r.minutes) meta.push(r.minutes + " min"); if (pc) meta.push(pc);
+    return '<div class="entry"><div class="entry-top"><div class="ex-title"><span class="entry-name">' + round1(r.miles) + ' mi' + (r.note ? ' \u00b7 ' + esc(r.note) : '') + '</span></div><div class="entry-right"><button class="icon-btn danger" data-action="run-del" data-id="' + r.id + '" aria-label="Delete">' + SVG.trash + '</button></div></div><div class="cardio-stats">' + SVG.pulse + ' ' + meta.join(" \u00b7 ") + '</div></div>';
+  }).join("") : '<div class="empty">No runs logged this week yet.</div>';
+  let planSection;
+  if (hasRace) {
+    const raceMon = mondayISO(run.raceDate);
+    const auto = autoTargets() || {};
+    const pweeks = []; let d = new Date(thisMon + "T00:00:00"); const end = new Date(raceMon + "T00:00:00");
+    while (d <= end) { pweeks.push(d.toISOString().slice(0, 10)); d.setDate(d.getDate() + 7); }
+    const rows = pweeks.map(w => {
+      const isRace = auto[w] && auto[w].race;
+      const now = w === thisMon;
+      if (isRace) return '<div class="rw-row plan"><span class="rw-label">' + weekLabel(w) + '</span><span class="rw-race">Race \uD83C\uDFC1</span></div>';
+      return '<div class="rw-row plan"><span class="rw-label">' + weekLabel(w) + (now ? ' \u00b7 now' : '') + '</span><input type="text" class="num rw-goal" data-week="' + w + '" inputmode="decimal" value="' + effectiveGoal(w) + '"><span class="rw-mi">mi</span></div>';
+    }).join("");
+    planSection = '<p class="eyebrow" style="margin-top:24px;">Training plan</p><div class="card pad">' + rows + '</div><div class="run-note-sm">Edit any week to override it \u2014 the rest follow the plan automatically.</div>';
+  } else {
+    let weeks = []; for (let i = 0; i < 6; i++) { const d = new Date(thisMon + "T00:00:00"); d.setDate(d.getDate() - i * 7); weeks.push(d.toISOString().slice(0, 10)); }
+    const recent = weeks.map(mon => { const mi = runMilesInWeek(mon); const g = effectiveGoal(mon); const p = g > 0 ? Math.min(100, Math.round(mi / g * 100)) : 0; return '<div class="rw-row"><span class="rw-label">' + weekLabel(mon) + (mon === thisMon ? ' \u00b7 now' : '') + '</span><div class="rw-bar"><div class="rw-fill' + (mi >= g ? " good" : "") + '" style="width:' + p + '%"></div></div><span class="rw-val">' + round1(mi) + '/' + g + '</span></div>'; }).join("");
+    planSection = '<p class="eyebrow" style="margin-top:24px;">Recent weeks</p><div class="card pad">' + recent + '</div>';
+  }
+  $("run-content").innerHTML = top + card + form +
+    '<p class="eyebrow" style="margin-top:24px;">This week\u2019s runs</p><div>' + runList + '</div>' + planSection;
+}
+function runAdd() {
+  const distEl = document.getElementById("run-dist"); const dist = parseFloat(distEl ? distEl.value : "");
+  if (!Number.isFinite(dist) || dist <= 0) { alert("Enter the distance in miles."); return; }
+  const minEl = document.getElementById("run-min"); const minRaw = minEl ? minEl.value : "";
+  const min = (minRaw && minRaw.trim() !== "" && Number.isFinite(parseFloat(minRaw)) && parseFloat(minRaw) > 0) ? parseFloat(minRaw) : null;
+  const noteEl = document.getElementById("run-note"); const note = ((noteEl ? noteEl.value : "") || "").trim();
+  run.runs.push({ id: uid(), date: todayISO(), miles: dist, minutes: min, note: note, ts: Date.now() });
+  saveRun(); renderRun();
+}
+function onRunClick(e) {
+  const btn = e.target.closest("[data-action]"); if (!btn) return;
+  const a = btn.dataset.action;
+  if (a === "run-add") runAdd();
+  else if (a === "run-del") { run.runs = run.runs.filter(x => x.id !== btn.dataset.id); saveRun(); renderRun(); }
+  else if (a === "race-save") {
+    const dEl = document.getElementById("race-date"); const dateVal = dEl ? dEl.value : "";
+    if (!dateVal) { alert("Pick your marathon date."); return; }
+    const sEl = document.getElementById("race-start"); const s = parseFloat(sEl ? sEl.value : "");
+    run.raceDate = dateVal;
+    run.startMiles = (Number.isFinite(s) && s > 0) ? s : (run.startMiles || 10);
+    raceEditOpen = false; saveRun(); renderRun();
+  }
+  else if (a === "race-edit") { raceEditOpen = true; renderRun(); }
+  else if (a === "race-cancel") { raceEditOpen = false; renderRun(); }
+}
+function onRunChange(e) {
+  const t = e.target;
+  if (t.id === "run-goal") { const v = parseFloat(t.value); const m = mondayISO(todayISO()); if (Number.isFinite(v) && v > 0) run.goals[m] = v; else delete run.goals[m]; saveRun(); renderRun(); return; }
+  if (t.classList.contains("rw-goal")) { const w = t.dataset.week; const v = parseFloat(t.value); if (Number.isFinite(v) && v > 0) run.goals[w] = v; else delete run.goals[w]; saveRun(); renderRun(); return; }
+}
+
 /* ---- Supabase cloud sync ---- */
 function localHasData() { return workouts.length > 0 || plan.days.length > 0 || (body.weights && body.weights.length > 0) || Object.keys(food.days || {}).some(function (d) { return (food.days[d] || []).length > 0; }); }
 async function pushCloud() {
   if (!sb || !session) return;
-  try { await sb.from("app_data").upsert({ user_id: session.user.id, payload: { workouts: workouts, body: body, plan: { plans: plans, activeId: activePlanId }, food: food }, updated_at: new Date(localTS || Date.now()).toISOString() }, { onConflict: "user_id" }); } catch (e) {}
+  try { await sb.from("app_data").upsert({ user_id: session.user.id, payload: { workouts: workouts, body: body, plan: { plans: plans, activeId: activePlanId }, food: food, run: run }, updated_at: new Date(localTS || Date.now()).toISOString() }, { onConflict: "user_id" }); } catch (e) {}
 }
 function applyCloud(p) {
   if (!p) return;
@@ -1720,8 +1879,9 @@ function applyCloud(p) {
   if (p.body) { body = Object.assign({ heightCm: null, heightUnit: "ft", weightUnit: "lb", goal: "build", weights: [] }, p.body); if (!Array.isArray(body.weights)) body.weights = []; }
   if (p.plan) loadPlanStructure(p.plan);
   if (p.food && p.food.days) food = p.food;
+  if (p.run && typeof p.run === "object") { run = p.run; if (!run.goals) run.goals = {}; if (!Array.isArray(run.runs)) run.runs = []; }
   for (const w of workouts) { if (w.done === false && w.date < todayISO()) w.done = true; }
-  Store.save(K_WORKOUTS, workouts); Store.save(K_BODY, body); Store.save(K_PLAN, plan); Store.save(K_FOOD, food);
+  Store.save(K_WORKOUTS, workouts); Store.save(K_BODY, body); Store.save(K_PLAN, plan); Store.save(K_FOOD, food); Store.save(K_RUN, run);
   const tw = activeWorkout(); if (tw) expandedSet.add(tw.id);
   renderAll();
 }
@@ -1843,6 +2003,8 @@ $("food-content").addEventListener("change", onFoodPageChange);
 $("foodsheet").addEventListener("click", onFoodClick);
 $("foodsheet").addEventListener("input", onFoodInput);
 $("foodsheet").addEventListener("change", onFoodChange);
+$("run-content").addEventListener("click", onRunClick);
+$("run-content").addEventListener("change", onRunChange);
 
 document.querySelector(".tabbar").addEventListener("click", (e) => { const b = e.target.closest(".tab"); if (b) setTab(b.dataset.tab); });
 
