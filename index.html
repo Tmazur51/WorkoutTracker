@@ -8,7 +8,7 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <meta name="apple-mobile-web-app-title" content="Onward">
 <meta name="theme-color" content="#FAFAF7">
-<title>Onward</title>
+<title>Onward · Marathon Training</title>
 <style>
   :root {
     --bg: #FAFAF7; --surface: #FFFFFF; --surface-2: #F3F3EF; --line: #ECECE7; --line-2: #E2E2DC;
@@ -327,7 +327,7 @@
   <div class="wrap">
     <header class="app-header">
       <div class="brand-tile"><svg class="ic ic-lg" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg></div>
-      <div><div class="brand-title">Onward</div><div class="brand-sub" id="brand-sub">Track your training and progress</div></div>
+      <div><div class="brand-title">Onward</div><div class="brand-sub" id="brand-sub">Marathon training · weekly miles</div></div>
     </header>
 
     <div id="banner"><strong>Preview mode.</strong> Storage is blocked here, so nothing is remembered between reloads. On your phone everything saves automatically.</div>
@@ -409,11 +409,6 @@
       </div>
     </section>
 
-    <section class="page" id="page-food">
-      <p class="eyebrow">Food</p>
-      <div id="food-content"></div>
-    </section>
-
     <section class="page" id="page-history">
       <p class="eyebrow">Past workouts</p>
       <div id="history-content"></div>
@@ -436,13 +431,12 @@
   </div>
 
   <nav class="tabbar"><div class="tabbar-inner">
+    <button class="tab" data-tab="run"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="5" r="1.8"/><path d="M4 21l3.5-5 2.5-2-1-5"/><path d="M9 9l4.5 1.5 2.5-2.5"/><path d="M13.5 10.5l1 4 3.5 2.5"/><path d="M4.5 13.5l3-1.5"/></svg><span>Run</span></button>
     <button class="tab" data-tab="log"><svg class="ic" viewBox="0 0 24 24" fill="currentColor"><rect x="1.5" y="9" width="3" height="6" rx="1"/><rect x="4.5" y="10.5" width="2" height="3"/><rect x="6.5" y="11" width="11" height="2" rx="1"/><rect x="17.5" y="10.5" width="2" height="3"/><rect x="19.5" y="9" width="3" height="6" rx="1"/></svg><span>Log</span></button>
     <button class="tab" data-tab="history"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 111 6"/><path d="M12 8v4l3 2"/></svg><span>History</span></button>
     <button class="tab" data-tab="plan"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="5" width="14" height="16" rx="2"/><path d="M9 5V3.5h6V5"/><path d="M9 11h6"/><path d="M9 15h4"/></svg><span>Edit</span></button>
     <button class="tab" data-tab="progress"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 20V11"/><path d="M12 20V4"/><path d="M19 20v-6"/></svg><span>Progress</span></button>
     <button class="tab" data-tab="body"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4"/></svg><span>Body</span></button>
-    <button class="tab" data-tab="food"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3v18"/><path d="M6 3v5a2 2 0 004 0V3"/><path d="M16 21V3c-2 0-3 2-3 5s1 4 3 4"/></svg><span>Food</span></button>
-    <button class="tab" data-tab="run"><svg class="ic" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="15.5" cy="5" r="1.8"/><path d="M4 21l3.5-5 2.5-2-1-5"/><path d="M9 9l4.5 1.5 2.5-2.5"/><path d="M13.5 10.5l1 4 3.5 2.5"/><path d="M4.5 13.5l3-1.5"/></svg><span>Run</span></button>
   </div></nav>
 
   <div id="picker"></div>
@@ -451,7 +445,7 @@
   <div id="logflow"></div>
   <div id="foodsheet"></div>
   <div id="authsheet"></div>
-  <div id="version">v3.1</div>
+  <div id="version">v3.3</div>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script>
@@ -993,13 +987,13 @@ function renderChart() {
   if (series.length > 1) { const diff = round1(last - series[0].value); if (diff !== 0) txt += "  \u00b7  " + (diff > 0 ? "+" : "\u2212") + Math.abs(diff) + " " + u + " since " + fmtShort(series[0].date); }
   latest.textContent = txt;
 }
-function renderAll() { renderStats(); renderTop(); renderCards(); renderHistory(); renderPlan(); renderBody(); renderChartSelect(); renderChart(); renderFood(); renderRun(); }
+function renderAll() { renderStats(); renderTop(); renderCards(); renderHistory(); renderPlan(); renderBody(); renderChartSelect(); renderChart(); renderRun(); }
 
 function setTab(t) {
   activeTab = t;
-  ["log", "history", "plan", "progress", "body", "food", "run"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
+  ["log", "history", "plan", "progress", "body", "run"].forEach(p => { $("page-" + p).style.display = (p === t) ? "block" : "none"; });
   document.querySelectorAll(".tabbar .tab").forEach(b => b.classList.toggle("on", b.dataset.tab === t));
-  const subs = { log: "Track your training and progress", history: "Your logged workouts", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target", food: "Log meals against your targets", run: "Marathon training \u00b7 weekly miles" };
+  const subs = { log: "Strength workouts \u00b7 log a session", history: "Your logged workouts", plan: "Build and edit your workouts", progress: "See your progress over time", body: "BMI and daily protein target", food: "Log meals against your targets", run: "Marathon training \u00b7 weekly miles" };
   $("brand-sub").textContent = subs[t] || "";
   renderAll();
   window.scrollTo({ top: 0, behavior: "auto" });
@@ -1997,9 +1991,6 @@ $("add-cardio-btn").addEventListener("click", () => openCardio(null));
 $("finish-workout-btn").addEventListener("click", function () { const w = activeWorkout(); if (!w) return; if (w.entries.length === 0) { if (!confirm("This workout is empty. Discard it?")) return; workouts = workouts.filter(x => x.id !== w.id); } else { w.done = true; } save(); renderAll(); window.scrollTo({ top: 0, behavior: "auto" }); });
 $("logflow").addEventListener("click", onFlowClick);
 $("logflow").addEventListener("input", onFlowInput);
-$("food-content").addEventListener("click", onFoodPageClick);
-$("food-content").addEventListener("input", onFoodPageInput);
-$("food-content").addEventListener("change", onFoodPageChange);
 $("foodsheet").addEventListener("click", onFoodClick);
 $("foodsheet").addEventListener("input", onFoodInput);
 $("foodsheet").addEventListener("change", onFoodChange);
@@ -2026,7 +2017,7 @@ $("authsheet").addEventListener("input", onAuthInput);
 $("sync-btn").addEventListener("click", function () { if (session) authSignOut(); else openAuth(); });
 document.addEventListener("visibilitychange", function () { if (document.visibilityState === "visible" && sb && session) syncReconcile(); });
 
-setTab("log");
+setTab("run");
 updateSyncUI();
 initSupabase();
 </script>
